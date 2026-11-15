@@ -20,8 +20,9 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<':
 // ---- Screen ---------------------------------------------------------------------------------------
 const canvas = $('#game'), ctx = canvas.getContext('2d');
 const VIEW = { k: 1 };
+const TOUCH = matchMedia('(pointer: coarse)').matches;
 function fit() {
-  const k = Math.min(innerWidth / W, innerHeight / H), r = k * (devicePixelRatio || 1);
+  const k = Math.min(innerWidth / W, innerHeight / H), r = k * Math.min(devicePixelRatio || 1, TOUCH ? 1 : 1.5); // 디벗: 1x is plenty, 2x+ fills 4× the pixels
   canvas.width = Math.round(W * r); canvas.height = Math.round(H * r);
   canvas.style.width = Math.round(W * k) + 'px'; canvas.style.height = Math.round(H * k) + 'px';
   canvas.style.marginTop = Math.max(0, Math.floor((innerHeight - H * k) / 2)) + 'px';
@@ -161,16 +162,36 @@ function startLogin() {
   let ch = Number(sget('bq:ch')) || 1;
   const mark = () => document.querySelectorAll('.chan').forEach(b => b.classList.toggle('sel', +b.dataset.ch === ch));
   document.querySelectorAll('.chan').forEach(b => b.onclick = () => { ch = +b.dataset.ch; mark(); }); mark();
+  const R = $('#room'), msg = $('#roomMsg'), solo = !!params.get('offline');
+  $('#roomRow').classList.toggle('hide', solo); msg.classList.toggle('hide', solo);
+  R.value = sget('bq:room') || ''; R.oninput = () => { R.value = R.value.replace(/\D/g, '').slice(0, 4); };
+  const say = (t, bad) => { msg.textContent = t; msg.classList.toggle('bad', !!bad); };
+  let busy = false;
+  const enter = async then => { // the teacher must have opened this room
+    if (busy) return; if (solo) { then(); return; }
+    const code = R.value.trim();
+    if (!/^\d{4}$/.test(code)) { say('방 번호 4자리를 먼저 써 주세요!', true); R.focus(); return; }
+    busy = true; say('방을 찾는 중…');
+    let o = null, now = Date.now();
+    try { const n = await netConnect(roomBase(code), m => say(m)); o = await n.get('open'); now = n.now(); }
+    catch (e) { busy = false; say('서버에 연결하지 못했어요. 와이파이를 확인하고 다시 눌러 주세요.', true); return; }
+    busy = false;
+    if (!o) { say(`${code}번 방이 없어요. 번호를 다시 확인해 주세요.`, true); return; }
+    if (!roomLive(o, now)) { say(`${code}번 방은 아직 열리지 않았어요(또는 닫혔어요). 선생님이 열 때까지 기다려요.`, true); return; }
+    sset('bq:room', code); then();
+  };
   if (sv && sv.job) {
     $('#cont').classList.remove('hide'); $('#cont').textContent = `이어하기 · ${sv.name} (Lv.${sv.lv} ${JOBS[sv.job].name})`;
-    $('#cont').onclick = () => { S = sv; sset('bq:ch', ch); go(ch); };
+    $('#cont').onclick = () => enter(() => { S = sv; sset('bq:ch', ch); go(ch); });
     $('#name').value = sv.name;
   }
   $('#newgame').onclick = () => {
     const name = $('#name').value.trim().slice(0, 8);
     if (!name) { $('#name').focus(); $('#name').placeholder = '이름을 먼저 써 주세요!'; return; }
-    S = { name, job: '', st: Object.fromEntries(STATS.map(s => [s, tune.base_stat])), ap: 0, look: { g: 'boy' }, lv: 1, exp: 0, inv: {}, fl: { trials: {} }, pid: '', lastSt: 1 };
-    sset('bq:ch', ch); startQuiz();
+    enter(() => {
+      S = { name, job: '', st: Object.fromEntries(STATS.map(s => [s, tune.base_stat])), ap: 0, look: { g: 'boy' }, lv: 1, exp: 0, inv: {}, fl: { trials: {} }, pid: '', lastSt: 1, room: sget('bq:room') || '' };
+      sset('bq:ch', ch); startQuiz();
+    });
   };
   if (auto && sv && sv.job) { sset('bq:auto', ''); S = sv; go(ch); }
 }
@@ -238,7 +259,15 @@ async function go(ch) {
   show('loading'); G.scene = 'loading'; G.ch = ch; G.id = myId();
   const say = m => { $('#loadMsg').textContent = m; };
   S.fl = S.fl || {}; S.fl.trials = S.fl.trials || {}; S.look = { g: S.look && S.look.g === 'girl' ? 'girl' : 'boy' };
-  try { G.net = params.get('offline') ? null : await netConnect(chanBase(ch), say); }
+  const solo = !!params.get('offline'), room = solo ? '' : sget('bq:room') || '';
+  if (!solo && !room) { startLogin(); return; }
+  let fresh = false;
+  if (!solo && S.room !== room) { // a new room is a new class: keep level, job and stats, start the quests again
+    fresh = !!S.room;
+    S.room = room; S.pid = ''; S.lastSt = 1; S.inv = {}; S.fl = { pro: S.fl.pro, boss: S.fl.boss, trials: {} }; delete S.map;
+  }
+  if (!solo) watchRoom(room);
+  try { G.net = solo ? null : await netConnect(chanBase(ch, room), say); }
   catch (e) { G.net = null; say('서버에 연결하지 못해 혼자 하기로 시작해요.'); await new Promise(r => setTimeout(r, 1200)); }
   if (G.net) {
     G.net.onKids('p', ps => { G.others = Object.fromEntries(Object.entries(ps || {}).filter(([k]) => k !== G.id)); pickHost(); refreshParty(); });
@@ -250,9 +279,22 @@ async function go(ch) {
   G.me.hp = maxHp(); G.me.mp = maxMp();
   if (S.pid) watchParty(S.pid); else if (!G.net && S.fl.left) makeParty(true);
   show('play'); G.scene = 'play'; startAudio(); hud(); refreshParty();
-  $('#chanTag').textContent = `채널 ${ch}${G.net ? '' : ' · 혼자 (선생님 확인 없이 자동 통과)'}`;
+  $('#chanTag').textContent = `${room ? `방 ${room} · ` : ''}채널 ${ch}${G.net ? '' : ' · 혼자 (선생님 확인 없이 자동 통과)'}`;
+  if (fresh) toast(`새 방(${room})이라 퀘스트를 처음부터 시작해요. 레벨·직업은 그대로예요.`);
   if (!S.fl.pro) toast('셀리 촌장에게 다가가 ↑ 키(또는 촌장을 터치)로 말을 걸어 보세요!');
   events.push({ type: 'join', ch, mode: G.net ? G.net.mode : 'solo' });
+}
+function watchRoom(room) { // the teacher closed the room: stop playing, keep my save
+  if (G.roomOff) G.roomOff();
+  netConnect(roomBase(room)).then(n => {
+    G.roomOff = n.on('open', o => {
+      if (o && roomLive(o, n.now())) return;
+      if (G.scene !== 'play' && G.scene !== 'loading') return;
+      save(); if (G.net) G.net.del('p/' + G.id);
+      G.unsub.forEach(f => f && f()); G.unsub = []; if (G.pOff) G.pOff(); G.pOff = null; BGM.el.pause(); BGM.want = "";
+      show('closed'); G.scene = 'closed';
+    });
+  }).catch(() => { /* no server: the channel connection reports it */ });
 }
 function netMap() { // listen to the map I am on
   G.unsub.forEach(f => f && f()); G.unsub = [];
@@ -1011,19 +1053,26 @@ function drawFigures() { // every figure side by side (?scene=figures)
   drawMon(ctx, 'boss', 1150, 700, -1, 0, false);
 }
 
-// ---- Teacher page (?teacher=1, PIN 1004): every party, its answers, trials and boss lair ------------------------------
+// ---- Teacher page (?teacher=1, 암호 교사): open a room, then every party, its answers, trials and boss lair ----------
+// 교사 typed in Korean, or the same keys on an English keyboard (rytk / RYTK): password fields often block Korean.
+const teacherOk = v => ['교사', 'rytk'].includes(String(v || '').normalize('NFC').replace(/\s+/g, '').toLowerCase());
 async function teacher() {
   show('teacher'); G.scene = 'teacher';
   const pin = $('#tPin');
-  await new Promise(ok => { $('#tGo').onclick = () => { if (pin.value === '1004') ok(); else { pin.value = ''; pin.placeholder = '암호가 달라요'; } }; });
-  $('#tLock').classList.add('hide'); $('#tMain').classList.remove('hide');
+  await new Promise(ok => {
+    const tryPin = () => { if (teacherOk(pin.value)) ok(); else { pin.value = ''; pin.placeholder = '암호가 달라요'; } };
+    $('#tGo').onclick = tryPin; pin.onkeydown = e => { if (e.key === 'Enter') tryPin(); };
+  });
+  $('#tLock').classList.add('hide');
+  const room = await openRoom();
+  $('#tOpen').classList.add('hide'); $('#tMain').classList.remove('hide');
   const nets = {}, data = {}, drafts = {};
   let ch = 1, dirty = true;
   const T = () => nets[ch].now();
   $('#tTabs').innerHTML = [1, 2, 3, 4, 5].map(n => `<button class="chan" data-tc="${n}">채널 ${n}</button>`).join('');
   document.querySelectorAll('[data-tc]').forEach(b => b.onclick = () => { ch = +b.dataset.tc; dirty = true; render(); });
   for (let c = 1; c <= 5; c++) {
-    try { nets[c] = await netConnect(chanBase(c), m => { $('#tState').textContent = m; }); } catch (e) { $('#tState').textContent = '연결 실패: 학교 와이파이를 확인해 주세요.'; return; }
+    try { nets[c] = await netConnect(chanBase(c, room.code), m => { $('#tState').textContent = m; }); } catch (e) { $('#tState').textContent = '연결 실패: 학교 와이파이를 확인해 주세요.'; return; }
     data[c] = { p: {}, pty: {} };
     nets[c].onKids('p', p => { data[c].p = p || {}; if (c === ch) dirty = true; });
     nets[c].on('pty', p => { data[c].pty = p || {}; if (c === ch) { dirty = true; render(); } });
@@ -1068,6 +1117,41 @@ async function teacher() {
   }
   setInterval(() => { dirty = true; if (!document.activeElement || !document.activeElement.dataset || !document.activeElement.dataset.dk) render(); }, 2500);
   render();
+}
+
+async function openRoom() { // the teacher opens the game: a room number the students type in
+  $('#tOpen').classList.remove('hide');
+  const msg = t => { $('#tOpenMsg').textContent = t; }, last = sget('bq:troom');
+  if (last) { $('#tAgain').classList.remove('hide'); $('#tAgain').textContent = `${last}번 방 다시 열기`; }
+  let busy = false;
+  const open = async code => {
+    if (busy) throw new Error('busy'); busy = true; msg('방을 여는 중…');
+    try {
+      for (let tries = 0; ; tries++) {
+        const c = code || String(1000 + Math.floor(Math.random() * 9000));
+        const n = await netConnect(roomBase(c), msg);
+        if (!code && tries < 5 && roomLive(await n.get('open'), n.now())) continue; // another class has it now
+        await n.set('open', { on: 1, t: n.now() }); sset('bq:troom', c); return { code: c, n };
+      }
+    } catch (e) { busy = false; msg('연결 실패: 학교 와이파이를 확인하고 다시 눌러 주세요.'); throw e; }
+  };
+  const r = await new Promise(ok => {
+    $('#tNew').onclick = () => open('').then(ok, () => {});
+    $('#tAgain').onclick = () => open(last).then(ok, () => {});
+  });
+  let on = true;
+  const bar = () => {
+    $('#tCode').textContent = r.code;
+    $('#tRoomState').textContent = on ? '열림 · 학생들이 이 번호로 들어와요' : '닫힘 · 새로 들어올 수 없고, 하던 학생도 멈춰요';
+    $('#tRoomState').classList.toggle('off', !on);
+    $('#tClose').textContent = on ? '게임 닫기' : '다시 열기'; $('#tClose').classList.toggle('on', !on);
+  };
+  $('#tClose').onclick = () => {
+    if (on && !confirm(`${r.code}번 방을 닫을까요? 하던 학생들도 처음 화면으로 돌아가요 (레벨·직업은 남아요).`)) return;
+    on = !on; r.n.set('open', { on: on ? 1 : 0, t: r.n.now() }); bar();
+  };
+  setInterval(() => { if (on) r.n.set('open', { on: 1, t: r.n.now() }); }, 30 * 60e3); // keep it fresh through a long class
+  bar(); return r;
 }
 
 // ---- Loop -------------------------------------------------------------------------------------------------------------------
@@ -1119,6 +1203,7 @@ $('#bChan').onclick = () => {
 };
 $('#bLeave').onclick = () => leaveParty(false);
 $('#bRevive').onclick = respawn;
+$('#bBack').onclick = () => { location.href = location.pathname + location.search; };
 canvas.addEventListener('pointerdown', e => { // touch an NPC to talk
   startAudio(); if (G.scene !== 'play' || frozen()) return;
   const r = canvas.getBoundingClientRect(), x = (e.clientX - r.left) / VIEW.k + G.cam.x, y = (e.clientY - r.top) / VIEW.k + G.cam.y;

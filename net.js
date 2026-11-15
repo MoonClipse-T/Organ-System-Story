@@ -102,5 +102,10 @@ async function restNet(base, stage) { // plain https for school networks that bl
     get: async p => { try { return ndec(at(p) ?? null); } catch (e) { return null; } },
   };
 }
-const chanBase = n => `rooms/body_ch${n}`;
+// The teacher opens a room (4-digit number, rooms/body_r<room>: open = { on, t }); its five channels live
+// beside it (rooms/body_r<room>_ch<N>). Without a room (?offline) the old fixed channels are used.
+const chanBase = (n, room) => (room ? `rooms/body_r${room}_ch${n}` : `rooms/body_ch${n}`);
+const roomBase = room => `rooms/body_r${room}`;
+const ROOM_HOURS = 12; // a room nobody re-opened for this long counts as closed
+const roomLive = (o, now) => !!(o && o.on && now - (o.t || 0) < ROOM_HOURS * 3600e3);
 function myId() { let id = sget('bq:id'); if (!id) { id = 'a' + Date.now().toString(36).slice(-5) + Math.random().toString(36).slice(2, 6); sset('bq:id', id); } return id; }
