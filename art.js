@@ -27,8 +27,46 @@ function shadow(c, x, y, w) { ell(c, x, y + 1, w, w * 0.22); c.fillStyle = 'rgba
 const HAIR = ['#4a2f23', '#1f1d2b', '#c77b30', '#e8c25a', '#a8455a', '#5b7bd6'];
 const SKIN = ['#ffe2c8', '#f6cfa8', '#e9b88f'];
 /** look: { hair, hs (style 0-3), skin }  a: { st: 'stand'|'walk'|'jump'|'climb'|'hurt', t, atk (0..1 or -1) } */
+// ---- painted parts (assets/sp): a head per gender, torso · arm · leg per outfit, put together and moved like a puppet
+const SP = {};
+for (const k of ['head-boy', 'head-girl', ...OUTFITS.flatMap(o => [`${o.id}-torso`, `${o.id}-arm`, `${o.id}-leg`]), ...['starch', 'protein', 'fat', 'urea'].map(m => 'mon-' + m), ...Object.keys(NPCS).map(n => 'npc-' + n)]) { const im = new Image(); im.onload = () => { SP[k] = im; }; im.src = `assets/sp/${k}.png`; }
+function dollReady(look) { const o = OUTFITS[look.o] || OUTFITS[0]; return SP[`head-${look.g}`] && SP[`${o.id}-torso`] && SP[`${o.id}-arm`] && SP[`${o.id}-leg`]; }
+/** a part hung from its pivot: top = the top middle (arms, legs), mid = the middle (head), bottom = the bottom middle (torso) */
+function part(c, im, x, y, ang, h, pivot, dark) {
+  const w = h * im.width / im.height;
+  c.save(); c.translate(x, y); c.rotate(ang); if (dark) c.filter = 'brightness(0.78)';
+  c.drawImage(im, -w / 2, pivot === 'top' ? -1 : pivot === 'mid' ? -h / 2 : -h, w, h); c.restore();
+}
+function drawDoll(c, x, y, f, job, look, a) {
+  const J = JOBS[job] || JOBS.warrior, O = OUTFITS[look.o] || OUTFITS[0], P = k => SP[`${O.id}-${k}`];
+  const walk = a.st === 'walk' ? Math.sin(a.t * 12) : 0, air = a.st === 'jump', climb = a.st === 'climb', atk = a.atk >= 0 ? a.atk : -1;
+  c.save(); c.translate(x, y);
+  if (!climb) shadow(c, 0, 0, 16);
+  c.scale(f, 1);
+  const bob = a.st === 'walk' ? Math.abs(Math.sin(a.t * 12)) * 2 : a.st === 'stand' ? Math.sin(a.t * 3) * 0.8 : 0;
+  c.translate(0, -bob);
+  const cs = climb ? Math.sin(a.t * 10) : 0;
+  const legA = climb ? cs * 0.5 : air ? -0.55 : walk * 0.55, legB = climb ? -cs * 0.5 : air ? 0.35 : -walk * 0.55;
+  part(c, P('leg'), -3, -19, legB, 20, 'top', true);
+  part(c, P('leg'), 4, -19, legA, 20, 'top');
+  const backArm = climb ? -2.9 + cs * 0.3 : atk >= 0 ? -0.6 : -walk * 0.6 + (air ? -0.8 : 0.15);
+  part(c, P('arm'), -4, -35, backArm, 18, 'top', true);
+  part(c, P('torso'), 0, O.ty, 0, O.th, 'bottom');
+  part(c, SP[`head-${look.g}`], 3, -55, climb ? -0.1 : 0, 41, 'mid');
+  const ang = climb ? -2.9 - cs * 0.3 : atk >= 0 ? (J.weapon === 'sword' ? -2.2 + atk * 3.2 : -1.3 + Math.sin(atk * Math.PI) * 0.4) : walk * 0.6 + (air ? -1.2 : -0.1);
+  c.save(); c.translate(5, -35); c.rotate(ang);
+  part(c, P('arm'), 0, 0, 0, 18, 'top');
+  if (!climb) { c.translate(0, 16); c.scale(0.75, 0.75); weapon(c, J.weapon, atk); }
+  c.restore();
+  if (atk >= 0 && J.weapon === 'sword') {
+    c.beginPath(); c.arc(8, -30, 46, -1.6 + atk * 2.4 - 1.1, -1.6 + atk * 2.4, false);
+    c.strokeStyle = `rgba(255,255,255,${0.8 * (1 - atk)})`; c.lineWidth = 6; c.stroke();
+  }
+  c.restore();
+}
 function drawHero(c, x, y, f, job, look, a) {
-  const J = JOBS[job] || JOBS.warrior, hair = HAIR[look.hair % HAIR.length], skin = SKIN[look.skin % SKIN.length];
+  if (look.g && dollReady(look)) return drawDoll(c, x, y, f, job, look, a);
+  const J = JOBS[job] || JOBS.warrior, hair = HAIR[(look.hair || 0) % HAIR.length], skin = SKIN[(look.skin || 0) % SKIN.length];
   const walk = a.st === 'walk' ? Math.sin(a.t * 12) : 0, air = a.st === 'jump', climb = a.st === 'climb';
   c.save(); c.translate(x, y);
   if (!climb) shadow(c, 0, 0, 16);
@@ -118,7 +156,16 @@ function star4(c, x, y, r, col, rot = 0) {
 function drawMon(c, k, x, y, f, t, flash, hpk) {
   c.save(); c.translate(x, y); shadow(c, 0, 0, k === 'boss' ? 90 : 22); c.scale(f, 1);
   if (flash) c.filter = 'brightness(1.8)';
-  if (k === 'starch') {
+  const im = SP['mon-' + k];
+  if (im) { // the painted mob, moved by kind
+    const H = { starch: 50, protein: 32, fat: 56, urea: 64 }[k], w = H * im.width / im.height;
+    let sx = 1, sy = 1, dy = 0, rot = 0;
+    if (k === 'starch') { sy = 1 + Math.sin(t * 6) * 0.07; sx = 2 - sy; }
+    else if (k === 'protein') { dy = -Math.abs(Math.sin(t * 7)) * 3; rot = Math.sin(t * 7) * 0.04; }
+    else if (k === 'fat') { dy = -Math.abs(Math.sin(t * 4)) * 14; sy = 1 + Math.sin(t * 8) * 0.05; }
+    else if (k === 'urea') { dy = -12 + Math.sin(t * 3) * 5; c.globalAlpha = 0.92; }
+    c.translate(0, dy); c.rotate(rot); c.scale(sx, sy); c.drawImage(im, -w / 2, -H, w, H);
+  } else if (k === 'starch') {
     const sq = 1 + Math.sin(t * 6) * 0.06;
     c.scale(1 / sq, sq);
     c.beginPath(); c.moveTo(-26, 0); c.bezierCurveTo(-28, -44, 28, -44, 26, 0); c.quadraticCurveTo(0, 5, -26, 0); fillS(c, '#f3eedc');
@@ -189,6 +236,13 @@ function drawNpc(c, id, x, y, t, lit) {
   c.save(); c.translate(x, y); shadow(c, 0, 0, 24);
   const b = Math.sin(t * 2.4) * 1.5;
   c.translate(0, -b);
+  const im = SP['npc-' + id];
+  if (im) { // painted NPC; the 발전소장 dims until the power is back
+    const H = { chief: 92, mito: 78, diaphragm: 72, tissue: 70, alveoli: 80 }[id] || 84, w = H * im.width / im.height;
+    if (id === 'mito' && !lit) c.filter = 'saturate(0.45) brightness(0.85)';
+    if (id === 'alveoli') c.translate(0, -10 + Math.sin(t * 3) * 4);
+    c.drawImage(im, -w / 2, -H, w, H); c.restore(); return;
+  }
   if (id === 'chief') {
     rr(c, -16, -36, 32, 36, 10); fillS(c, '#7cc47f');
     ell(c, 0, -52, 22, 20); fillS(c, '#ffe2c8'); eyes(c, -7, 7, -56, 0.9, -1);

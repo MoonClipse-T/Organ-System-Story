@@ -45,3 +45,147 @@
   model: "bytedance-seedream-5.5"
   date: 2026-11-16
   ships: true
+- path: assets/sp/head-boy.png
+  origin: ai
+  tool: "ElevenLabs image generation (flow GDDh7sKhAMM09xKV9k8j), cropped and scaled with ffmpeg"
+  model: "bytedance-seedream-5.5"
+  date: 2026-11-16
+  ships: true
+- path: assets/sp/head-girl.png
+  origin: ai
+  tool: "ElevenLabs image generation (flow GDDh7sKhAMM09xKV9k8j), cropped and scaled with ffmpeg"
+  model: "bytedance-seedream-5.5"
+  date: 2026-11-16
+  ships: true
+- path: assets/sp/mon-fat.png
+  origin: ai
+  tool: "ElevenLabs image generation (flow GDDh7sKhAMM09xKV9k8j), cropped and scaled with ffmpeg"
+  model: "bytedance-seedream-5.5"
+  date: 2026-11-16
+  ships: true
+- path: assets/sp/mon-protein.png
+  origin: ai
+  tool: "ElevenLabs image generation (flow GDDh7sKhAMM09xKV9k8j), cropped and scaled with ffmpeg"
+  model: "bytedance-seedream-5.5"
+  date: 2026-11-16
+  ships: true
+- path: assets/sp/mon-starch.png
+  origin: ai
+  tool: "ElevenLabs image generation (flow GDDh7sKhAMM09xKV9k8j), cropped and scaled with ffmpeg"
+  model: "bytedance-seedream-5.5"
+  date: 2026-11-16
+  ships: true
+- path: assets/sp/mon-urea.png
+  origin: ai
+  tool: "ElevenLabs image generation (flow GDDh7sKhAMM09xKV9k8j), cropped and scaled with ffmpeg"
+  model: "bytedance-seedream-5.5"
+  date: 2026-11-16
+  ships: true
+- path: assets/sp/npc-alveoli.png
+  origin: ai
+  tool: "ElevenLabs image generation (flow GDDh7sKhAMM09xKV9k8j), cropped and scaled with ffmpeg"
+  model: "bytedance-seedream-5.5"
+  date: 2026-11-16
+  ships: true
+- path: assets/sp/npc-chief.png
+  origin: ai
+  tool: "ElevenLabs image generation (flow GDDh7sKhAMM09xKV9k8j), cropped and scaled with ffmpeg"
+  model: "bytedance-seedream-5.5"
+  date: 2026-11-16
+  ships: true
+- path: assets/sp/npc-diaphragm.png
+  origin: ai
+  tool: "ElevenLabs image generation (flow GDDh7sKhAMM09xKV9k8j), cropped and scaled with ffmpeg"
+  model: "bytedance-seedream-5.5"
+  date: 2026-11-16
+  ships: true
+- path: assets/sp/npc-heart.png
+  origin: ai
+  tool: "ElevenLabs image generation (flow GDDh7sKhAMM09xKV9k8j), cropped and scaled with ffmpeg"
+  model: "bytedance-seedream-5.5"
+  date: 2026-11-16
+  ships: true
+- path: assets/sp/npc-mito.png
+  origin: ai
+  tool: "ElevenLabs image generation (flow GDDh7sKhAMM09xKV9k8j), cropped and scaled with ffmpeg"
+  model: "bytedance-seedream-5.5"
+  date: 2026-11-16
+  ships: true
+- path: assets/sp/npc-nephron.png
+  origin: ai
+  tool: "ElevenLabs image generation (flow GDDh7sKhAMM09xKV9k8j), cropped and scaled with ffmpeg"
+  model: "bytedance-seedream-5.5"
+  date: 2026-11-16
+  ships: true
+- path: assets/sp/npc-tissue.png
+  origin: ai
+  tool: "ElevenLabs image generation (flow GDDh7sKhAMM09xKV9k8j), cropped and scaled with ffmpeg"
+  model: "bytedance-seedream-5.5"
+  date: 2026-11-16
+  ships: true
+- path: assets/sp/npc-trachea.png
+  origin: ai
+  tool: "ElevenLabs image generation (flow GDDh7sKhAMM09xKV9k8j), cropped and scaled with ffmpeg"
+  model: "bytedance-seedream-5.5"
+  date: 2026-11-16
+  ships: true
+- path: assets/sp/npc-villi.png
+  origin: ai
+  tool: "ElevenLabs image generation (flow GDDh7sKhAMM09xKV9k8j), cropped and scaled with ffmpeg"
+  model: "bytedance-seedream-5.5"
+  date: 2026-11-16
+  ships: true
+- path: assets/sp/o0-arm.png
+  origin: ai
+  tool: "ElevenLabs image generation (flow GDDh7sKhAMM09xKV9k8j), cropped and scaled with ffmpeg"
+  model: "bytedance-seedream-5.5"
+  date: 2026-11-16
+  ships: true
+- path: assets/sp/o0-leg.png
+  origin: ai
+  tool: "ElevenLabs image generation (flow GDDh7sKhAMM09xKV9k8j), cropped and scaled with ffmpeg"
+  model: "bytedance-seedream-5.5"
+  date: 2026-11-16
+  ships: true
+- path: assets/sp/o0-torso.png
+  origin: ai
+  tool: "ElevenLabs image generation (flow GDDh7sKhAMM09xKV9k8j), cropped and scaled with ffmpeg"
+  model: "bytedance-seedream-5.5"
+  date: 2026-11-16
+  ships: true
+- path: assets/sp/o1-arm.png
+  origin: ai
+  tool: "ElevenLabs image generation (flow GDDh7sKhAMM09xKV9k8j), cropped and scaled with ffmpeg"
+  model: "bytedance-seedream-5.5"
+  date: 2026-11-16
+  ships: true
+- path: assets/sp/o1-leg.png
+  origin: ai
+  tool: "ElevenLabs image generation (flow GDDh7sKhAMM09xKV9k8j), cropped and scaled with ffmpeg"
+  model: "bytedance-seedream-5.5"
+  date: 2026-11-16
+  ships: true
+- path: assets/sp/o1-torso.png
+  origin: ai
+  tool: "ElevenLabs image generation (flow GDDh7sKhAMM09xKV9k8j), cropped and scaled with ffmpeg"
+  model: "bytedance-seedream-5.5"
+  date: 2026-11-16
+  ships: true
+- path: assets/sp/o2-arm.png
+  origin: ai
+  tool: "ElevenLabs image generation (flow GDDh7sKhAMM09xKV9k8j), cropped and scaled with ffmpeg"
+  model: "bytedance-seedream-5.5"
+  date: 2026-11-16
+  ships: true
+- path: assets/sp/o2-leg.png
+  origin: ai
+  tool: "ElevenLabs image generation (flow GDDh7sKhAMM09xKV9k8j), cropped and scaled with ffmpeg"
+  model: "bytedance-seedream-5.5"
+  date: 2026-11-16
+  ships: true
+- path: assets/sp/o2-torso.png
+  origin: ai
+  tool: "ElevenLabs image generation (flow GDDh7sKhAMM09xKV9k8j), cropped and scaled with ffmpeg"
+  model: "bytedance-seedream-5.5"
+  date: 2026-11-16
+  ships: true

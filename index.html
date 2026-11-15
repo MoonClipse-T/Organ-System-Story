@@ -40,6 +40,7 @@
   #qa button.ok { background: #a8f0b4; border-color: #2e9c4a; } #qa button.no { background: #ffb3b3; border-color: #c93a3a; }
 
   #job { flex-direction: column; gap: 14px; }
+  #lookRow { display: flex; gap: 8px; align-items: center; padding: 10px 14px; flex-wrap: wrap; justify-content: center; } #lookRow b { color: var(--gold); margin: 0 4px 0 10px; }
   #jobs { display: grid; grid-template-columns: repeat(4, minmax(130px, 200px)); gap: 12px; }
   .jcard { background: var(--win); border: 3px solid #5b6ea8; border-radius: 16px; padding: 10px; color: #fff; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 15px; }
   .jcard b { font-size: 26px; } .jcard small { color: #b8c8ee; } .jcard.sel { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold); }
@@ -129,6 +130,7 @@
 
 <div id="job" class="screen hide">
   <h1 style="font-size:40px">직업 고르기</h1>
+  <div id="lookRow" class="win"></div>
   <div id="jobs"></div>
   <div id="stats" class="win hide"></div>
 </div>

@@ -150,7 +150,7 @@ function startLogin() {
   $('#newgame').onclick = () => {
     const name = $('#name').value.trim().slice(0, 8);
     if (!name) { $('#name').focus(); $('#name').placeholder = '이름을 먼저 써 주세요!'; return; }
-    S = { name, job: '', st: Object.fromEntries(STATS.map(s => [s, tune.base_stat])), ap: 0, look: { hair: Math.floor(rng() * 6), hs: 0, skin: 0 }, lv: 1, exp: 0, q: 0, inv: {}, fl: {}, pt: '' };
+    S = { name, job: '', st: Object.fromEntries(STATS.map(s => [s, tune.base_stat])), ap: 0, look: { g: 'boy', o: 0, hair: 0, hs: 0, skin: 0 }, lv: 1, exp: 0, q: 0, inv: {}, fl: {}, pt: '' };
     sset('bq:ch', ch); startQuiz();
   };
   if (auto && sv && sv.job) { sset('bq:auto', ''); S = sv; go(ch); }
@@ -182,12 +182,24 @@ function startQuiz() {
 function startJob() {
   show('job'); G.scene = 'job';
   $('#jobs').innerHTML = Object.entries(JOBS).map(([k, j]) => `<button class="jcard" data-j="${k}"><canvas width="120" height="120"></canvas><b style="color:${j.color}">${j.name}</b><span>${j.blurb}</span><small>주 능력치 ${j.main} · 스킬 「${j.skill.name}」</small></button>`).join('');
+  lookRow();
   document.querySelectorAll('.jcard').forEach(b => {
-    const c = b.querySelector('canvas').getContext('2d'); c.translate(60, 112); c.scale(1.45, 1.45);
-    drawHero(c, 0, 0, 1, b.dataset.j, S.look, { st: 'stand', t: 0, atk: -1 });
     b.onclick = () => { S.job = b.dataset.j; document.querySelectorAll('.jcard').forEach(x => x.classList.toggle('sel', x === b)); statPanel(); };
   });
   $('#stats').classList.add('hide');
+}
+function lookRow() { // 성별 · 의상: the job cards show the choice as it changes
+  const R = $('#lookRow');
+  R.innerHTML = '<b>성별</b>' + GENDERS.map(([g, n]) => `<button class="chan ${S.look.g === g ? 'sel' : ''}" data-g="${g}">${n}</button>`).join('')
+    + '<b>의상</b>' + OUTFITS.map((o, i) => `<button class="chan ${S.look.o === i ? 'sel' : ''}" data-o="${i}">${o.name}</button>`).join('');
+  R.querySelectorAll('button').forEach(b => b.onclick = () => { if (b.dataset.g) S.look.g = b.dataset.g; else S.look.o = +b.dataset.o; lookRow(); });
+}
+function drawJobCards() {
+  document.querySelectorAll('.jcard canvas').forEach(cv => {
+    const c = cv.getContext('2d'), j = cv.parentNode.dataset.j, sel = S.job === j;
+    c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, 120, 120); c.translate(60, 110); c.scale(1.35, 1.35);
+    drawHero(c, 0, 0, 1, j, S.look, { st: sel ? 'walk' : 'stand', t: G.t, atk: sel && (G.t % 2.4) < 0.3 ? (G.t % 2.4) / 0.3 : -1 });
+  });
 }
 function statPanel() {
   const P = $('#stats'); P.classList.remove('hide');
@@ -195,10 +207,9 @@ function statPanel() {
   S.st = { ...base }; let left = S.ap;
   const draw = () => {
     P.innerHTML = `<h3>능력치 올리기 <span>남은 포인트 <b>${left}</b></span></h3>` + STATS.map(s => `<div class="st ${s === job().main ? 'main' : ''}"><span>${s}${s === job().main ? ' ★' : ''}</span><button data-s="${s}" data-d="-1">−</button><b>${S.st[s]}</b><button data-s="${s}" data-d="1">+</button></div>`).join('')
-      + `<div class="row"><button id="auto">★ 주 능력치에 모두</button><button id="hairB">머리 바꾸기</button></div><button id="startB" class="go">모험 시작!</button><p class="tip">입장 문제를 맞힌 만큼 포인트가 생겨요. ★ 주 능력치가 높을수록 공격이 세져요.</p>`;
+      + `<div class="row"><button id="auto">★ 주 능력치에 모두</button></div><button id="startB" class="go">모험 시작!</button><p class="tip">입장 문제를 맞힌 만큼 포인트가 생겨요. ★ 주 능력치가 높을수록 공격이 세져요.</p>`;
     P.querySelectorAll('[data-s]').forEach(b => b.onclick = () => { const s = b.dataset.s, d = +b.dataset.d; if (d > 0 && left > 0) { S.st[s]++; left--; } if (d < 0 && S.st[s] > base[s]) { S.st[s]--; left++; } draw(); });
     $('#auto').onclick = () => { S.st[job().main] += left; left = 0; draw(); };
-    $('#hairB').onclick = () => { S.look.hs = (S.look.hs + 1) % 4; if (!S.look.hs) S.look.hair = (S.look.hair + 1) % 6; startJob(); };
     $('#startB').onclick = () => { S.st[job().main] += left; S.ap = 0; go(Number(sget('bq:ch')) || 1); };
   };
   draw();
@@ -215,6 +226,7 @@ async function go(ch) {
     G.net.on('inv/' + G.id, iv => { if (iv && G.net.now() - iv.t < 30000 && iv.pt !== S.pt) invitePopup(iv); });
     G.net.on('boss', b => onBoss(b));
   }
+  if (!S.look.g) S.look = { ...S.look, g: 'boy', o: 0 }; // saves from before 성별·의상
   G.me = null; const m = S.map && MAPS[S.map] ? S.map : 'town';
   enterMap(m, S.map ? S.x : 300, S.map ? S.y : undefined);
   G.me.hp = maxHp(); G.me.mp = maxMp();
@@ -712,9 +724,11 @@ function drawPlay() {
 function drawPlant(lit) { // the 미토콘드리아 발전소 in town, by 미토
   const x = 1150, y = 800, c = ctx;
   c.save(); c.translate(x + 120, y);
-  c.beginPath(); c.ellipse(0, -110, 130, 80, 0, 0, Math.PI * 2); fillS(c, lit ? '#ffb15c' : '#b98a62', 4);
-  c.beginPath(); c.moveTo(-100, -110); for (let i = 0; i < 8; i++) c.quadraticCurveTo(-88 + i * 25, i % 2 ? -60 : -160, -75 + i * 25, -110); stroke(c, 4, lit ? '#c45a10' : '#6a4a30');
-  rr(c, -24, -40, 48, 40, 10); fillS(c, '#6a4a30', 3);
+  if (!IMG.town) { // the painted town has its own power plant; this one only stands in until it loads
+    c.beginPath(); c.ellipse(0, -110, 130, 80, 0, 0, Math.PI * 2); fillS(c, lit ? '#ffb15c' : '#b98a62', 4);
+    c.beginPath(); c.moveTo(-100, -110); for (let i = 0; i < 8; i++) c.quadraticCurveTo(-88 + i * 25, i % 2 ? -60 : -160, -75 + i * 25, -110); stroke(c, 4, lit ? '#c45a10' : '#6a4a30');
+    rr(c, -24, -40, 48, 40, 10); fillS(c, '#6a4a30', 3);
+  }
   if (lit) for (let i = 0; i < 5; i++) { const a = G.t * 2 + i * 1.26; star4(c, Math.cos(a) * 150, -110 + Math.sin(a) * 95, 7, '#fff3a0', G.t); }
   c.restore();
   tag('미토콘드리아 발전소' + (lit ? ' · 가동 중' : ' · 멈춤'), x + 120, y - 210, lit ? '#c46a10' : '#555');
@@ -763,12 +777,12 @@ function miniMap() {
 function drawTitle() {
   drawBack(ctx, MAPS.town, G.t * 30, 0, G.t, W, H, true);
   drawPlat(ctx, MAPS.town, -10, 600, W + 20, 'ground');
-  Object.keys(JOBS).forEach((j, i) => drawHero(ctx, 250 + i * 70, 600, 1, j, { hair: i + 1, hs: i, skin: i % 2 }, { st: 'walk', t: G.t + i * 0.3, atk: -1 }));
+  Object.keys(JOBS).forEach((j, i) => drawHero(ctx, 250 + i * 70, 600, 1, j, { g: i % 2 ? 'girl' : 'boy', o: i % 3, hair: i + 1, hs: i, skin: i % 2 }, { st: 'walk', t: G.t + i * 0.3, atk: -1 }));
   drawMon(ctx, 'starch', 760, 600, -1, G.t, false); drawMon(ctx, 'protein', 860, 600, -1, G.t + 1, false); drawMon(ctx, 'fat', 950, 600, -1, G.t + 2, false); drawMon(ctx, 'urea', 1040, 600, -1, G.t + 3, false);
 }
 function drawFigures() { // every figure side by side (?scene=figures)
   ctx.fillStyle = '#e8f4ff'; ctx.fillRect(0, 0, W, H);
-  Object.keys(JOBS).forEach((j, i) => { drawHero(ctx, 120 + i * 130, 220, 1, j, { hair: i, hs: i, skin: 0 }, { st: 'stand', t: 0, atk: -1 }); text(JOBS[j].name, 120 + i * 130, 250, 20, OL); });
+  Object.keys(JOBS).forEach((j, i) => { drawHero(ctx, 120 + i * 130, 220, 1, j, { g: i % 2 ? 'girl' : 'boy', o: i % 3, hair: i, hs: i, skin: 0 }, { st: 'stand', t: 0, atk: -1 }); text(JOBS[j].name, 120 + i * 130, 250, 20, OL); });
   ['starch', 'protein', 'fat', 'urea'].forEach((k, i) => { drawMon(ctx, k, 700 + i * 140, 220, 1, 0, false); text(MONS[k].name, 700 + i * 140, 250, 18, OL); });
   Object.keys(NPCS).forEach((id, i) => { drawNpc(ctx, id, 90 + i * 130, 470, 0, true); text(NPCS[id].name, 90 + i * 130, 500, 16, OL); });
   drawMon(ctx, 'boss', 1120, 700, -1, 0, false);
@@ -829,7 +843,7 @@ function hudBars() { const m = G.me; $('#hHp').style.width = `${(m.hp / maxHp())
 function drawFrame() {
   if (G.scene === 'figures') drawFigures();
   else if (G.scene === 'play') drawPlay();
-  else if (G.scene !== 'teacher') drawTitle();
+  else if (G.scene !== 'teacher') { drawTitle(); if (G.scene === 'job') drawJobCards(); }
 }
 let last = clock.now(), acc = 0;
 function tick() { const now = clock.now(); acc += Math.min(now - last, 0.25); last = now; while (acc >= STEP) { step(); acc -= STEP; } drawFrame(); }

@@ -29,13 +29,20 @@ const JOBS = {
     atk: { range: 260, mult: 0.9, hits: 1, cd: 0.5, shot: 'spark' }, skill: { name: '에너지 볼트', range: 400, mult: 2.4, hits: 1, mp: 10, cd: 0.6, shot: 'bolt' }, hpBonus: 0, mpBase: 50 },
 };
 const STATS = ['STR', 'DEX', 'INT', 'LUK'];
+// 의상: painted parts in assets/sp/<id>-torso|arm|leg.png. th: torso height (px), ty: where the torso's bottom sits
+const OUTFITS = [
+  { id: 'o0', name: '모험가 옷', th: 28, ty: -14 },
+  { id: 'o1', name: '후드티', th: 30, ty: -14 },
+  { id: 'o2', name: '교복', th: 34, ty: -9 },
+];
+const GENDERS = [['boy', '남학생'], ['girl', '여학생']];
 
 // ---- 몬스터 ----------------------------------------------------------------------------------
 const MONS = {
   starch: { name: '녹말 슬라임', hp: 60, dmg: 6, exp: 5, speed: 38, drop: 'glucose', w: 52, h: 40 },
-  protein: { name: '단백질 꾸물이', hp: 80, dmg: 8, exp: 7, speed: 44, drop: 'amino', w: 64, h: 34 },
-  fat: { name: '지방 방울', hp: 70, dmg: 7, exp: 6, speed: 52, drop: 'fatty', w: 44, h: 46 },
-  urea: { name: '요소 유령', hp: 90, dmg: 9, exp: 8, speed: 46, drop: 'urea', w: 50, h: 56 },
+  protein: { name: '단백질 꾸물이', hp: 80, dmg: 8, exp: 7, speed: 44, drop: 'amino', w: 100, h: 34 },
+  fat: { name: '지방 방울', hp: 70, dmg: 7, exp: 6, speed: 52, drop: 'fatty', w: 48, h: 56 },
+  urea: { name: '요소 유령', hp: 90, dmg: 9, exp: 8, speed: 46, drop: 'urea', w: 56, h: 70 },
   boss: { name: '세균 대왕 박테리오', hp: 3000, dmg: 16, exp: 120, speed: 60, drop: null, w: 190, h: 170 },
 };
 
