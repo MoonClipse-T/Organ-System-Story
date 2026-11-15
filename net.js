@@ -33,12 +33,17 @@ async function netConnect(base, stage = () => {}) {
   addEventListener('storage', e => e.key && fire(e.key));
   const read = k => { const v = localStorage.getItem(k); return v == null ? null : JSON.parse(v); };
   const kids = p => { const pre = K(p) + '/', o = {}; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k.startsWith(pre) && !k.slice(pre.length).includes('/')) o[k.slice(pre.length)] = read(k); } return o; };
+  const tree = p => { // a whole branch, nested (party records keep their parts in sub-paths)
+    const pre = K(p) + '/'; let o = null;
+    for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (!k.startsWith(pre)) continue; const ks = k.slice(pre.length).split('/'); o = o || {}; let t = o; ks.slice(0, -1).forEach(s => { t = t[s] = t[s] && typeof t[s] === 'object' ? t[s] : {}; }); t[ks[ks.length - 1]] = read(k); }
+    return o;
+  };
   const sub = f => { subs.add(f); return () => subs.delete(f); };
   return {
     mode: 'local', now: () => Date.now(),
     set(p, v) { localStorage.setItem(K(p), JSON.stringify(v)); fire(K(p)); },
     del(p) { const k = K(p), pre = k + '/'; for (let i = localStorage.length - 1; i >= 0; i--) { const x = localStorage.key(i); if (x === k || x.startsWith(pre)) localStorage.removeItem(x); } fire(k); },
-    on(p, cb) { const k = K(p); const off = sub(x => (x === k || k.startsWith(x + '/')) && cb(read(k))); cb(read(k)); return off; },
+    on(p, cb) { const k = K(p), v = () => read(k) ?? tree(p); const off = sub(x => (x === k || k.startsWith(x + '/') || x.startsWith(k + '/')) && cb(v())); cb(v()); return off; },
     onKids(p, cb) { const pre = K(p) + '/', k = K(p); const off = sub(x => (x === k || x.startsWith(pre) || k.startsWith(x + '/')) && cb(kids(p))); cb(kids(p)); return off; },
     get: async p => read(K(p)) ?? (Object.keys(kids(p)).length ? kids(p) : null),
   };
@@ -92,7 +97,7 @@ async function restNet(base, stage) { // plain https for school networks that bl
     mode: 'rest', now: () => Date.now() + off,
     set: (p, v) => { const s = JSON.stringify(v); change(p, s); return req(p, { method: 'PUT', body: JSON.stringify(s) }).catch(() => {}); },
     del: p => { change(p, null); return req(p, { method: 'DELETE' }).catch(() => {}); },
-    on: (p, cb) => sub({ p: seg(p).join('/'), f: () => cb(parse(at(p))) }),
+    on: (p, cb) => sub({ p: seg(p).join('/'), f: () => { let v = null; try { v = ndec(at(p) ?? null); } catch (e) { /* a broken value */ } cb(v); } }),
     onKids: (p, cb) => sub({ p: seg(p).join('/'), f: () => { const o = at(p), r = {}; if (o && typeof o === 'object') for (const [k, v] of Object.entries(o)) { const x = parse(v); if (x !== null) r[k] = x; } cb(r); } }),
     get: async p => { try { return ndec(at(p) ?? null); } catch (e) { return null; } },
   };

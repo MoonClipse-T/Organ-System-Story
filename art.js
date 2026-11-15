@@ -29,8 +29,9 @@ const SKIN = ['#ffe2c8', '#f6cfa8', '#e9b88f'];
 /** look: { hair, hs (style 0-3), skin }  a: { st: 'stand'|'walk'|'jump'|'climb'|'hurt', t, atk (0..1 or -1) } */
 // ---- painted parts (assets/sp): a head per gender, torso · arm · leg per outfit, put together and moved like a puppet
 const SP = {};
-for (const k of ['head-boy', 'head-girl', ...OUTFITS.flatMap(o => [`${o.id}-torso`, `${o.id}-arm`, `${o.id}-leg`]), ...['starch', 'protein', 'fat', 'urea'].map(m => 'mon-' + m), ...Object.keys(NPCS).map(n => 'npc-' + n)]) { const im = new Image(); im.onload = () => { SP[k] = im; }; im.src = `assets/sp/${k}.png`; }
-function dollReady(look) { const o = OUTFITS[look.o] || OUTFITS[0]; return SP[`head-${look.g}`] && SP[`${o.id}-torso`] && SP[`${o.id}-arm`] && SP[`${o.id}-leg`]; }
+const THEME_LEDGE = { town: 1, digest: 1, lung: 1, vessel: 1, kidney: 1 };
+for (const k of ['head-boy', 'head-girl', ...Object.keys(JOBS).flatMap(j => [`${j}-torso`, `${j}-arm`, `${j}-leg`]), ...['starch', 'protein', 'fat', 'urea'].map(m => 'mon-' + m), ...Object.keys(NPCS).map(n => 'npc-' + n), ...Object.keys(THEME_LEDGE).map(t => 'ledge-' + t)]) { const im = new Image(); im.onload = () => { SP[k] = im; }; im.src = `assets/sp/${k}.png`; }
+function dollReady(look, job) { return SP[`head-${look.g}`] && SP[`${job}-torso`] && SP[`${job}-arm`] && SP[`${job}-leg`]; }
 /** a part hung from its pivot: top = the top middle (arms, legs), mid = the middle (head), bottom = the bottom middle (torso) */
 function part(c, im, x, y, ang, h, pivot, dark) {
   const w = h * im.width / im.height;
@@ -38,7 +39,7 @@ function part(c, im, x, y, ang, h, pivot, dark) {
   c.drawImage(im, -w / 2, pivot === 'top' ? -1 : pivot === 'mid' ? -h / 2 : -h, w, h); c.restore();
 }
 function drawDoll(c, x, y, f, job, look, a) {
-  const J = JOBS[job] || JOBS.warrior, O = OUTFITS[look.o] || OUTFITS[0], P = k => SP[`${O.id}-${k}`];
+  const J = JOBS[job] || JOBS.warrior, O = JOB_LOOK[job] || JOB_LOOK.warrior, P = k => SP[`${job}-${k}`];
   const walk = a.st === 'walk' ? Math.sin(a.t * 12) : 0, air = a.st === 'jump', climb = a.st === 'climb', atk = a.atk >= 0 ? a.atk : -1;
   c.save(); c.translate(x, y);
   if (!climb) shadow(c, 0, 0, 16);
@@ -52,7 +53,7 @@ function drawDoll(c, x, y, f, job, look, a) {
   const backArm = climb ? -2.9 + cs * 0.3 : atk >= 0 ? -0.6 : -walk * 0.6 + (air ? -0.8 : 0.15);
   part(c, P('arm'), -4, -35, backArm, 18, 'top', true);
   part(c, P('torso'), 0, O.ty, 0, O.th, 'bottom');
-  part(c, SP[`head-${look.g}`], 3, -55, climb ? -0.1 : 0, 41, 'mid');
+  part(c, SP[`head-${look.g}`], 1, -52 + (a.st === 'walk' ? Math.sin(a.t * 24) * 0.6 : 0), climb ? -0.08 : atk >= 0 ? 0.06 : 0, 38, 'mid'); // side profile: looks where it walks
   const ang = climb ? -2.9 - cs * 0.3 : atk >= 0 ? (J.weapon === 'sword' ? -2.2 + atk * 3.2 : -1.3 + Math.sin(atk * Math.PI) * 0.4) : walk * 0.6 + (air ? -1.2 : -0.1);
   c.save(); c.translate(5, -35); c.rotate(ang);
   part(c, P('arm'), 0, 0, 0, 18, 'top');
@@ -65,7 +66,7 @@ function drawDoll(c, x, y, f, job, look, a) {
   c.restore();
 }
 function drawHero(c, x, y, f, job, look, a) {
-  if (look.g && dollReady(look)) return drawDoll(c, x, y, f, job, look, a);
+  if (look.g && dollReady(look, job)) return drawDoll(c, x, y, f, job, look, a);
   const J = JOBS[job] || JOBS.warrior, hair = HAIR[(look.hair || 0) % HAIR.length], skin = SKIN[(look.skin || 0) % SKIN.length];
   const walk = a.st === 'walk' ? Math.sin(a.t * 12) : 0, air = a.st === 'jump', climb = a.st === 'climb';
   c.save(); c.translate(x, y);
@@ -137,7 +138,7 @@ function weapon(c, w, atk) {
     c.beginPath(); c.moveTo(0, 10); c.lineTo(0, 40); stroke(c, 1, '#9fb0c4');
   } else if (w === 'star') { star4(c, 0, 4, 8, '#c9d2e0'); }
   else if (w === 'bow') {
-    c.save(); c.rotate(-Math.PI / 2 + 0.2);
+    c.save(); c.rotate(0.15); // the bow bends forward, away from the face
     c.beginPath(); c.arc(0, 0, 22, -1.1, 1.1); c.lineWidth = 5; c.strokeStyle = OL; c.stroke(); c.lineWidth = 3; c.strokeStyle = '#8a5a2b'; c.stroke();
     c.beginPath(); c.moveTo(22 * Math.cos(-1.1), 22 * Math.sin(-1.1)); c.lineTo(22 * Math.cos(1.1) - (atk >= 0 ? 6 : 0), 22 * Math.sin(1.1)); stroke(c, 1.2, '#eee');
     c.restore();
@@ -371,9 +372,42 @@ function drawLungTree(c, map) {
   for (const [gx, gy] of [[1080, 250], [1150, 215], [1220, 250], [1110, 290], [1190, 292], [300, 260], [360, 230], [420, 262]]) { ell(c, gx, gy, 30, 28); fillS(c, '#ffb3c6', 3); ell(c, gx - 8, gy - 9, 8, 5, -0.5); c.fillStyle = 'rgba(255,255,255,.6)'; c.fill(); }
 }
 const LUNG_STAGES = [[3300, '1단계 · 기관'], [2560, '2단계 · 기관지'], [1820, '3단계 · 더 가는 기관지'], [1080, '4단계 · 폐포 바로 앞'], [340, '꼭대기 · 폐포']];
+// painted ledges (assets/sp/ledge-<theme>.png): caps at both ends and a middle that repeats, every other copy mirrored
+// so the joins meet. top: how far down the picture its walkable top edge sits.
+const LEDGE = {}, LEDGE_TOP = { town: 0.13, digest: 0.11, lung: 0.1, vessel: 0.13, kidney: 0.14 };
+function ledgeOf(theme) {
+  const im = SP['ledge-' + theme]; if (!im) return null;
+  if (!LEDGE[theme]) {
+    let body = THEME[theme].body;
+    try { const cv = document.createElement('canvas'); cv.width = im.width; cv.height = im.height; const x = cv.getContext('2d'); x.drawImage(im, 0, 0); const d = x.getImageData(im.width >> 1, Math.floor(im.height * 0.6), 1, 1).data; if (d[3] > 200) body = `rgb(${d[0]},${d[1]},${d[2]})`; } catch (e) { /* file:// pictures cannot be read back */ }
+    LEDGE[theme] = { im, top: LEDGE_TOP[theme] || 0.12, body };
+  }
+  return LEDGE[theme];
+}
+function slice3(c, im, sh, x, y, w, h) {
+  const cw = im.width * 0.2, k = h / sh, dc = Math.min(cw * k, w / 2), mx = im.width * 0.3, mw = im.width * 0.4, dm = mw * k;
+  c.drawImage(im, 0, 0, cw, sh, x, y, dc, h);
+  c.drawImage(im, im.width - cw, 0, cw, sh, x + w - dc, y, dc, h);
+  for (let p = x + dc, i = 0; p < x + w - dc - 0.5; p += dm, i++) {
+    const ww = Math.min(dm, x + w - dc - p), sw = mw * ww / dm;
+    if (i % 2) { c.save(); c.translate(p + ww, y); c.scale(-1, 1); c.drawImage(im, mx + mw - sw, 0, sw, sh, 0, 0, ww, h); c.restore(); }
+    else c.drawImage(im, mx, 0, sw, sh, p, y, ww, h);
+  }
+}
 /** a foothold in the map's look; solid ground is drawn as a deep block */
 function drawPlat(c, map, x, y, w, kind) {
-  const T = THEME[map.theme];
+  const T = THEME[map.theme], L = ledgeOf(map.theme);
+  if (L) {
+    if (kind === 'ground') { // the top of the ledge as a band, then its own body colour all the way down
+      const h = 90, sh = L.im.height * 0.5;
+      c.fillStyle = L.body; c.fillRect(x, y + h * 0.4, w, map.h - y + 400);
+      slice3(c, L.im, sh, x - 20, y - L.top * 2 * h, w + 40, h);
+    } else {
+      const h = kind === 'floor' ? 46 : 40;
+      slice3(c, L.im, L.im.height, x - 6, y - L.top * h, w + 12, h);
+    }
+    return;
+  }
   if (kind === 'ground') {
     c.fillStyle = T.body; c.fillRect(x, y, w, map.h - y + 400);
     c.fillStyle = T.top; c.fillRect(x, y - 4, w, 18);
@@ -430,4 +464,21 @@ function drawItemIcon(c, id, x, y, s = 1) {
   else if (id === 'energy') { c.beginPath(); c.moveTo(3, -12); c.lineTo(-7, 2); c.lineTo(0, 2); c.lineTo(-3, 12); c.lineTo(8, -3); c.lineTo(1, -3); c.closePath(); fillS(c, it.color, 2); }
   else { rr(c, -9, -9, 18, 18, 6); fillS(c, it.color, 2); }
   c.restore();
+}
+
+// ---- 어려움 장애물 -------------------------------------------------------------------------------
+function drawOrb(c, x, y, t, theme) { // 먼지 덩어리 (기관지) or 혈전 덩어리 (혈관): shoves you off
+  if (theme === 'vessel') { drawClot(c, x, y + 22, t); return; }
+  c.save(); c.translate(x, y); c.rotate(t * 2);
+  c.beginPath(); for (let i = 0; i < 18; i++) { const a = i / 18 * Math.PI * 2, r = i % 2 ? 17 : 23; c.lineTo(Math.cos(a) * r, Math.sin(a) * r); } c.closePath(); fillS(c, '#9a9488', 2.5);
+  c.rotate(-t * 2); ell(c, -6, -3, 3, 3.5); ell(c, 6, -3, 3, 3.5); c.fillStyle = OL; c.fill();
+  c.beginPath(); c.moveTo(-10, -10); c.lineTo(-3, -7); c.moveTo(10, -10); c.lineTo(3, -7); stroke(c, 2);
+  c.restore();
+}
+function drawGeyser(c, x, y, h, warn, theme) { // a blast from below: bubbles first, then a column
+  const col = theme === 'vessel' ? ['rgba(255,120,120,.85)', '#ffd0d0'] : ['rgba(230,245,255,.9)', '#ffffff'];
+  if (warn) { for (let i = 0; i < 5; i++) { ell(c, x - 18 + i * 9, y - 6 - (i % 2) * 6, 5, 5); c.fillStyle = col[0]; c.fill(); stroke(c, 1.5); } return; }
+  const g = c.createLinearGradient(0, y - h, 0, y); g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(0.3, col[0]); g.addColorStop(1, col[1]);
+  c.beginPath(); c.moveTo(x - 26, y); c.quadraticCurveTo(x - 34, y - h * 0.6, x - 12, y - h); c.lineTo(x + 12, y - h); c.quadraticCurveTo(x + 34, y - h * 0.6, x + 26, y); c.closePath();
+  c.fillStyle = g; c.fill(); stroke(c, 2.5, 'rgba(42,28,36,.6)');
 }
