@@ -1,0 +1,168 @@
+<!doctype html>
+<!-- PROTOTYPE - NOT FOR PRODUCTION -->
+<!-- Question: 기관계마다 다른 메이플식 퀘스트를 깨다 보면 소화·호흡·순환·배설이 세포 호흡으로 이어진다는 걸 아이들이 놀면서 느끼는가? -->
+<!-- Date: 2026-11-16 -->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>몸속 원정대</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+<style>
+  :root { --win: linear-gradient(180deg, #2c3a66, #1b2442); --edge: #8fb4ff; --gold: #ffd23f; --ink: #2a1c24; }
+  html, body { margin: 0; height: 100%; background: #10142a; overflow: hidden; font-family: 'Jua', 'Malgun Gothic', sans-serif; color: #fff;
+    -webkit-user-select: none; user-select: none; touch-action: none; -webkit-tap-highlight-color: transparent; }
+  canvas#game { display: block; margin: 0 auto; }
+  .hide { display: none !important; }
+  button { font-family: inherit; cursor: pointer; border: 0; }
+  .win { background: var(--win); border: 3px solid var(--edge); border-radius: 18px; box-shadow: 0 0 0 3px #0b0f22, 0 12px 40px rgba(0,0,0,.5); }
+  .go { background: linear-gradient(180deg, #ffbf47, #ff8a1f); color: #3a1d00; font-size: 22px; padding: 12px 26px; border-radius: 14px; border: 3px solid #7a3a00; box-shadow: 0 4px 0 #7a3a00; }
+  .go:active { transform: translateY(3px); box-shadow: 0 1px 0 #7a3a00; }
+  .tip { color: #b8c8ee; font-size: 15px; margin: 8px 0 0; }
+
+  .screen { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+  #login .win, #quiz .win, #loading .win { width: min(560px, 92vw); padding: 26px 28px; text-align: center; }
+  h1 { margin: 0 0 4px; font-size: 54px; color: var(--gold); text-shadow: 0 4px 0 #8a3a00, 0 0 18px rgba(255,210,63,.5); letter-spacing: 2px; }
+  .sub { color: #cfe0ff; margin: 0 0 18px; font-size: 18px; }
+  input { font-family: inherit; font-size: 24px; padding: 10px 14px; border-radius: 12px; border: 3px solid var(--edge); width: 70%; text-align: center; -webkit-user-select: text; user-select: text; }
+  #chans { display: flex; gap: 8px; justify-content: center; margin: 16px 0; flex-wrap: wrap; }
+  .chan { background: #33416f; color: #fff; font-size: 18px; padding: 10px 14px; border-radius: 12px; border: 2px solid #5b6ea8; }
+  .chan.sel { background: #5aa2ff; border-color: #fff; color: #10203e; }
+  #cont { display: block; margin: 12px auto 0; background: #3a9d5d; color: #fff; font-size: 18px; padding: 10px 18px; border-radius: 12px; border: 3px solid #1f5a34; }
+  #tlink { position: fixed; right: 12px; bottom: 10px; color: #8fa0c8; font-size: 14px; }
+
+  #qn { color: var(--gold); font-size: 18px; } #qq { font-size: 28px; margin: 14px 0 18px; line-height: 1.4; }
+  .bar { height: 10px; background: #0e1430; border-radius: 6px; overflow: hidden; } #qbar { height: 100%; width: 0; background: linear-gradient(90deg, #5aa2ff, #9fe6ff); transition: width .3s; }
+  #qa { display: grid; gap: 10px; margin-top: 16px; }
+  #qa button:not(.go) { background: #f6f2e8; color: var(--ink); font-size: 20px; text-align: left; padding: 12px 16px; border-radius: 12px; border: 3px solid #c9bfa8; }
+  #qa button b { display: inline-block; width: 30px; height: 30px; line-height: 30px; text-align: center; background: #2c3a66; color: #fff; border-radius: 50%; margin-right: 8px; }
+  #qa button.ok { background: #a8f0b4; border-color: #2e9c4a; } #qa button.no { background: #ffb3b3; border-color: #c93a3a; }
+
+  #job { flex-direction: column; gap: 14px; }
+  #jobs { display: grid; grid-template-columns: repeat(4, minmax(130px, 200px)); gap: 12px; }
+  .jcard { background: var(--win); border: 3px solid #5b6ea8; border-radius: 16px; padding: 10px; color: #fff; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 15px; }
+  .jcard b { font-size: 26px; } .jcard small { color: #b8c8ee; } .jcard.sel { border-color: var(--gold); box-shadow: 0 0 0 3px var(--gold); }
+  .jcard canvas { background: radial-gradient(#3e5598, #22305a); border-radius: 12px; }
+  #stats { padding: 16px 22px; width: min(520px, 92vw); }
+  #stats h3 { margin: 0 0 8px; display: flex; justify-content: space-between; } #stats h3 b { color: var(--gold); }
+  .st { display: grid; grid-template-columns: 90px 44px 60px 44px; align-items: center; gap: 8px; justify-content: center; margin: 4px 0; font-size: 20px; }
+  .st.main span { color: var(--gold); } .st button { background: #5aa2ff; color: #10203e; font-size: 22px; border-radius: 10px; height: 38px; }
+  .st b { text-align: center; } .row { display: flex; gap: 8px; justify-content: center; margin: 10px 0; }
+  .row button { background: #33416f; color: #fff; padding: 8px 12px; border-radius: 10px; font-size: 16px; border: 2px solid #5b6ea8; }
+  #stats .go { display: block; margin: 6px auto 0; }
+
+  /* play */
+  #play { pointer-events: none; display: block; } #play > * { pointer-events: auto; }
+  #hudBar { position: fixed; left: 50%; transform: translateX(-50%); bottom: 6px; display: flex; gap: 10px; align-items: center; padding: 6px 12px; border-radius: 14px; background: rgba(16,20,40,.85); border: 2px solid #5b6ea8; }
+  #hLv { color: var(--gold); font-size: 22px; } #hName { font-size: 16px; min-width: 110px; }
+  .gauge { position: relative; width: 150px; height: 18px; background: #0b0f22; border-radius: 9px; overflow: hidden; border: 2px solid #000; }
+  .gauge i { position: absolute; inset: 0 auto 0 0; display: block; transition: width .2s; } .gauge span { position: absolute; inset: 0; text-align: center; font-size: 12px; line-height: 18px; text-shadow: 0 1px 2px #000; }
+  #hHp { background: linear-gradient(#ff7a7a, #e0303a); } #hMp { background: linear-gradient(#7ac8ff, #2f7fd1); } #hExp { background: linear-gradient(#fff38a, #e6b800); }
+  #quest { position: fixed; right: 10px; top: 10px; width: 290px; padding: 10px 12px; background: rgba(16,20,40,.8); border: 2px solid var(--gold); border-radius: 12px; font-size: 14px; }
+  #quest b { color: var(--gold); font-size: 16px; } #quest p { margin: 4px 0 6px; color: #dfe8ff; line-height: 1.35; }
+  #quest span { display: inline-block; margin: 2px 4px 0 0; padding: 2px 8px; border-radius: 8px; background: #33416f; } #quest span.done { background: #2e9c4a; }
+  #bag { position: fixed; right: 10px; top: 170px; display: flex; flex-wrap: wrap; gap: 4px; width: 290px; justify-content: flex-end; font-size: 13px; }
+  #bag span { display: flex; align-items: center; gap: 2px; background: rgba(16,20,40,.75); border-radius: 8px; padding: 2px 6px 2px 2px; } #bag em { color: #8fa0c8; font-size: 12px; }
+  #topBtns { position: fixed; left: 12px; top: 232px; display: flex; flex-direction: column; gap: 6px; }
+  #topBtns button { background: rgba(16,20,40,.82); color: #fff; border: 2px solid #5b6ea8; border-radius: 10px; padding: 7px 10px; font-size: 15px; text-align: left; }
+  #chanTag { position: fixed; left: 270px; top: 14px; background: rgba(16,20,40,.75); padding: 4px 10px; border-radius: 8px; font-size: 14px; }
+  #partyBox { position: fixed; left: 12px; top: 380px; width: 200px; font-size: 13px; }
+  .ph { color: #9fc6ff; } .pm { background: rgba(16,20,40,.8); border-radius: 8px; padding: 4px 6px; margin-top: 3px; } .pm i { display: block; height: 6px; background: #300; border-radius: 3px; overflow: hidden; } .pm u { display: block; height: 100%; background: #ff5a5a; }
+  .panel { position: fixed; left: 130px; top: 232px; width: 320px; max-height: 60vh; overflow: auto; padding: 12px; font-size: 15px; }
+  .panel h3 { margin: 0 0 6px; color: var(--gold); }
+  .pl { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid #33416f; } .pl small { color: #9fb0d8; }
+  .pl button { background: #5aa2ff; color: #10203e; border-radius: 8px; padding: 4px 10px; font-size: 14px; } .pl em { color: #9fc6ff; font-style: normal; }
+  #toast { position: fixed; left: 50%; top: 210px; transform: translateX(-50%) translateY(-10px); opacity: 0; transition: .25s; background: rgba(16,20,40,.9); border: 2px solid var(--gold); padding: 10px 18px; border-radius: 12px; font-size: 18px; pointer-events: none; max-width: 80vw; text-align: center; }
+  #toast.on { opacity: 1; transform: translateX(-50%); }
+  #skillTag { position: fixed; right: 16px; bottom: 236px; font-size: 13px; color: #cfe0ff; text-shadow: 0 1px 3px #000; }
+
+  #dlg { position: fixed; left: 50%; bottom: 80px; transform: translateX(-50%); width: min(760px, 94vw); display: flex; gap: 14px; padding: 14px 16px; background: #fbf7ec; color: var(--ink); border: 4px solid #2c3a66; border-radius: 18px; box-shadow: 0 10px 30px rgba(0,0,0,.45); }
+  #dlg canvas { background: radial-gradient(#fff, #e7efe0); border-radius: 12px; border: 2px solid #c9bfa8; flex: none; }
+  #dlg .dr { flex: 1; display: flex; flex-direction: column; } #dlgName { color: #2c3a66; font-size: 18px; margin-bottom: 6px; }
+  #dlgText { flex: 1; font-size: 22px; line-height: 1.5; } #dlgNext { align-self: flex-end; font-size: 18px; padding: 8px 18px; }
+  #dlg, #card, #links, #dead, #invite, .panel { z-index: 5; }
+  #card, #links, #dead { position: fixed; inset: 0; background: rgba(8,10,24,.6); display: flex; align-items: center; justify-content: center; }
+  .cin { width: min(560px, 92vw); background: #fbf7ec; color: var(--ink); border: 5px solid var(--c); border-radius: 20px; padding: 22px 26px; text-align: center; box-shadow: 0 0 0 4px #2a1c24; }
+  .cin small { color: #8a7a6a; font-size: 16px; } .cin h2 { margin: 6px 0; font-size: 40px; color: var(--c); text-shadow: 0 2px 0 #2a1c2422; } .cin p { font-size: 21px; line-height: 1.55; }
+  .lin { width: min(980px, 96vw); background: #fbf7ec; color: var(--ink); border-radius: 20px; padding: 16px 20px; text-align: center; border: 5px solid #2c3a66; }
+  .lin h2 { margin: 0; font-size: 34px; color: #2c3a66; } .lin p { font-size: 19px; line-height: 1.5; margin: 6px 10px 12px; }
+  .lin svg { width: 100%; height: auto; max-height: 52vh; } .lin text { font-family: 'Jua'; font-size: 20px; text-anchor: middle; fill: #2a1c24; paint-order: stroke; stroke: #fbf7ec; stroke-width: 6px; }
+  .lin .nn { font-size: 26px; stroke: none; } .lin .nd { font-size: 15px; stroke: none; fill: #5a4a4a; }
+  .ar { opacity: 0; animation: arIn .5s forwards; } @keyframes arIn { to { opacity: 1; } }
+  #invite { position: fixed; left: 50%; top: 40%; transform: translateX(-50%); padding: 16px 22px; text-align: center; font-size: 20px; }
+  #invite button:not(.go) { background: #33416f; color: #fff; font-size: 20px; padding: 12px 22px; border-radius: 12px; margin-left: 8px; }
+  #dead .win { padding: 22px 30px; text-align: center; font-size: 22px; }
+
+  /* tablet buttons */
+  #pad, #acts { position: fixed; bottom: 70px; display: grid; gap: 8px; }
+  #pad { left: 18px; grid-template-columns: repeat(3, 66px); grid-template-rows: repeat(2, 66px); }
+  #acts { right: 18px; grid-template-columns: repeat(2, 78px); grid-template-rows: repeat(2, 78px); }
+  .k { background: rgba(255,255,255,.22); color: #fff; border: 3px solid rgba(255,255,255,.55); border-radius: 50%; font-size: 22px; text-shadow: 0 1px 3px #000; touch-action: none; }
+  .k.on { background: rgba(255,210,63,.6); } .k.big { font-size: 18px; }
+  .k[data-key="KeyZ"] { background: rgba(255,120,90,.45); } .k[data-key="KeyX"] { background: rgba(120,170,255,.45); } .k[data-key="Space"] { background: rgba(120,220,140,.45); }
+  @media (hover: hover) and (pointer: fine) { #pad, #acts { opacity: .45; } }
+
+  /* teacher */
+  #teacher { overflow: auto; align-items: flex-start; background: #10142a; }
+  #teacher .win { width: min(1100px, 96vw); margin: 20px auto; padding: 18px 22px; }
+  #teacher section { margin: 14px 0; padding: 10px; background: rgba(0,0,0,.2); border-radius: 12px; }
+  #teacher h3 small { color: #9fb0d8; font-size: 15px; margin-left: 8px; }
+  .tb { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; } .tb button { background: #ff8a1f; color: #2a1000; padding: 8px 12px; border-radius: 10px; font-size: 15px; } .tb .warn { background: #6a3040; color: #fff; }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; } td, th { padding: 4px 6px; border-bottom: 1px solid #33416f; text-align: left; } th { color: var(--gold); }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="login" class="screen hide"><div class="win">
+  <h1>몸속 원정대</h1><p class="sub">Organ System Story · 소화 · 호흡 · 순환 · 배설, 그리고 세포 호흡</p>
+  <input id="name" maxlength="8" placeholder="캐릭터 이름">
+  <div id="chans"></div>
+  <button id="newgame" class="go">새로 시작 (입장 문제)</button>
+  <button id="cont" class="hide"></button>
+</div><a id="tlink" href="?teacher=1">선생님</a></div>
+
+<div id="quiz" class="screen hide"><div class="win">
+  <div id="qn"></div><div class="bar"><div id="qbar"></div></div><div id="qq"></div><div id="qa"></div>
+</div></div>
+
+<div id="job" class="screen hide">
+  <h1 style="font-size:40px">직업 고르기</h1>
+  <div id="jobs"></div>
+  <div id="stats" class="win hide"></div>
+</div>
+
+<div id="loading" class="screen hide"><div class="win"><h1 style="font-size:36px">입장 중…</h1><p id="loadMsg" class="sub"></p></div></div>
+
+<div id="play" class="screen hide">
+  <div id="hudBar"><span id="hLv"></span><span id="hName"></span>
+    <div class="gauge"><i id="hHp"></i><span id="hHpT"></span></div><div class="gauge"><i id="hMp"></i><span id="hMpT"></span></div><div class="gauge"><i id="hExp"></i><span id="hExpT"></span></div></div>
+  <div id="quest"></div><div id="bag"></div><div id="chanTag"></div><div id="skillTag"></div>
+  <div id="topBtns"><button id="bParty">파티 · 친구</button><button id="bChan">채널</button><button id="bMute">소리 끄기</button></div>
+  <div id="partyBox"></div>
+  <div id="partyPanel" class="panel win hide"><h3>이 채널의 친구들</h3><div id="plist"></div><div class="row"><button id="bLeave">파티 나가기</button></div></div>
+  <div id="chanPanel" class="panel win hide"></div>
+  <div id="pad"><span></span><button class="k" data-key="ArrowUp">▲</button><span></span><button class="k" data-key="ArrowLeft">◀</button><button class="k" data-key="ArrowDown">▼</button><button class="k" data-key="ArrowRight">▶</button></div>
+  <div id="acts"><button class="k big" data-key="KeyX">스킬</button><button class="k big" data-key="ArrowUp">대화</button><button class="k big" data-key="KeyZ">공격</button><button class="k big" data-key="Space">점프</button></div>
+  <div id="dlg" class="hide"><canvas id="dlgPic" width="140" height="160"></canvas><div class="dr"><div id="dlgName"></div><div id="dlgText"></div><button id="dlgNext" class="go"></button></div></div>
+  <div id="card" class="hide"></div><div id="links" class="hide"></div>
+  <div id="invite" class="win hide"></div>
+  <div id="dead" class="hide"><div class="win"><p>쓰러졌어요… 세포 마을에서 다시 시작해요.</p><button id="bRevive" class="go">다시 일어나기</button></div></div>
+  <div id="toast"></div>
+</div>
+
+<div id="teacher" class="screen hide"><div class="win">
+  <h2 style="margin:0">몸속 원정대 · 선생님</h2>
+  <div id="tLock" style="margin:14px 0"><input id="tPin" type="password" placeholder="선생님 암호" style="width:220px"> <button id="tGo" class="go">열기</button></div>
+  <div id="tMain" class="hide"><p id="tState" class="tip"></p><p class="tip">보스 버튼을 누르면 그 채널의 그 맵에 보스가 떨어져요. 보스 체력은 그 맵에 있는 학생 수에 맞춰져요.</p><div id="tChans"></div></div>
+</div></div>
+<div id="none" class="screen hide"></div>
+
+<script src="config.js"></script>
+<script src="data.js"></script>
+<script src="art.js"></script>
+<script src="net.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
