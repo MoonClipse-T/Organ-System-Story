@@ -27,6 +27,7 @@
   - Lv.10 강타(한 마리에게 아주 센 한 방, 8초에 한 번): 전사 대지 강타 · 도적 급소 표창 · 궁수 저격 · 마법사 번개 일격
   - 마법사는 던지지 않아요: 공격은 적 위에서 터지는 마법, 스킬은 매직 클로(할퀴는 마법 두 번)
 - 혼자 해 보기: `?offline=1` (방 번호 없이)
+- 맵 하나만 시험: `?try=vesselH` (혈관 급류 어려움) · `vessel`(쉬움) · `lung` · `lungH` · `digest` · `kidney`, 직업·레벨은 `&job=mage&lv=10` (warrior · thief · archer · mage). 시험용 캐릭터라 저장되지 않아요
 
 수업 앞 개념 정리 슬라이드(교과서 230~231쪽, 6쪽 + 게임 QR): `concept.html` — 원본은 `과학2_2학기_생명/수업 강의자료 모음/Vibe code(과학2)/_build/decks/09_organteam` (빌드: `node tools/build.mjs 09_organteam`)
 

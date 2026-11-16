@@ -7,6 +7,7 @@
 'use strict';
 
 const params = new URLSearchParams(location.search);
+const TRY = params.get('try'); // ?try=vesselH : straight into one map with a throwaway character (nothing is saved)
 const tune = new Proxy({}, { get: (_, k) => CONFIG[k].value });
 const STEP = 1 / 60, W = 1280, H = 720, FONT = "'Jua', 'Malgun Gothic', sans-serif";
 const clock = window.GAME_CLOCK || { now: () => performance.now() / 1000 };
@@ -90,7 +91,7 @@ function setMuted(m) { muted = m; if (audio) audio.out.gain.value = m ? 0 : tune
 const SAVE_KEY = 'bq:save';
 // what is saved: { name, job, st{STR..}, look{g}, lv, exp, inv{}, fl{pro, left, loaded, exhaled, urine, seen, trials{}}, pid, lastSt, quiz, map, x, y }
 let S = null;
-function save() { if (S && G.me) sset(SAVE_KEY, JSON.stringify({ ...S, map: G.map && G.map.inst ? 'town' : G.mapId, x: Math.round(G.me.x), y: Math.round(G.me.y) })); }
+function save() { if (TRY) return; if (S && G.me) sset(SAVE_KEY, JSON.stringify({ ...S, map: G.map && G.map.inst ? 'town' : G.mapId, x: Math.round(G.me.x), y: Math.round(G.me.y) })); }
 function loadSave() { try { return JSON.parse(sget(SAVE_KEY) || 'null'); } catch (e) { return null; } }
 const job = () => JOBS[S.job];
 const maxHp = () => Math.round(tune.hp_base + S.lv * tune.hp_per_lv + job().hpBonus);
@@ -261,7 +262,7 @@ async function go(ch) {
   show('loading'); G.scene = 'loading'; G.ch = ch; G.id = myId();
   const say = m => { $('#loadMsg').textContent = m; };
   S.fl = S.fl || {}; S.fl.trials = S.fl.trials || {}; S.look = { g: S.look && S.look.g === 'girl' ? 'girl' : 'boy' };
-  const solo = !!params.get('offline'), room = solo ? '' : sget('bq:room') || '';
+  const solo = !!(params.get('offline') || TRY), room = solo ? '' : sget('bq:room') || '';
   if (!solo && !room) { startLogin(); return; }
   let fresh = false;
   if (!solo && S.room !== room) { // a new room is a new class: keep level, job and stats, start the quests again
@@ -282,7 +283,7 @@ async function go(ch) {
   G.me.hp = maxHp(); G.me.mp = maxMp();
   if (S.pid) watchParty(S.pid); else if (!G.net && S.fl.left) makeParty(true);
   show('play'); G.scene = 'play'; startAudio(); hud(); refreshParty();
-  $('#chanTag').textContent = `${room ? `방 ${room} · ` : ''}채널 ${ch}${G.net ? '' : ' · 혼자 (선생님 확인 없이 자동 통과)'}`;
+  $('#chanTag').textContent = TRY ? `시험 모드 · ${G.map.name}${G.map.hard ? ' (어려움)' : ''} · 저장 안 됨 · 새로고침하면 처음부터` : `${room ? `방 ${room} · ` : ''}채널 ${ch}${G.net ? '' : ' · 혼자 (선생님 확인 없이 자동 통과)'}`;
   if (fresh) toast(`새 방(${room})이라 퀘스트를 처음부터 시작해요. 레벨·직업은 그대로예요.`);
   if (!S.fl.pro) toast('셀리 촌장에게 다가가 ↑ 키(또는 촌장을 터치)로 말을 걸어 보세요!');
   events.push({ type: 'join', ch, mode: G.net ? G.net.mode : 'solo' });
@@ -1429,6 +1430,14 @@ addEventListener('pagehide', () => { save(); if (G.net) G.net.del('p/' + G.id); 
 
 if (params.get('scene') === 'figures') { G.scene = 'figures'; show('none'); }
 else if (params.get('teacher')) teacher();
+else if (TRY) tryMap(TRY);
 else startLogin();
+function tryMap(id) { // a test run of one map: ?try=vessel | vesselH | lung | lungH | digest | kidney, &job=mage, &lv=10
+  const map = MAPS[id] ? id : 'vesselH', base = map.replace(/H$/, ''), q = { digest: 1, lung: 2, vessel: 3, kidney: 5 }[base] || 1;
+  const j = JOBS[params.get('job')] ? params.get('job') : 'warrior', lv = Math.max(1, Math.min(30, Number(params.get('lv')) || 5));
+  S = { name: '시험', job: j, look: { g: 'boy' }, lv, exp: 0, inv: {}, quiz: 7, pid: '', lastSt: q, map, x: MAPS[map].portals[0].x + 60,
+    fl: { pro: 1, told: q, left: 1, loaded: base === 'vessel' ? 1 : 0, trials: {} } };
+  go(1);
+}
 if (params.get('manual') === '1') drawFrame();
 else { requestAnimationFrame(frame); setInterval(timer, 50); }
