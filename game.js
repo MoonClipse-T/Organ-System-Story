@@ -96,6 +96,7 @@ const job = () => JOBS[S.job];
 const maxHp = () => Math.round(tune.hp_base + S.lv * tune.hp_per_lv + job().hpBonus);
 const maxMp = () => Math.round(job().mpBase + S.lv * 6);
 const knows = k => S.lv >= SKILL_LV[k]; // move (Lv.5) · power (Lv.10)
+const atkPower = () => Math.round(tune.dmg_base + (S.quiz || 0) * tune.dmg_per_answer); // only the entry quiz; levels never add
 const expNeed = () => tune.exp_per_lv * S.lv;
 const has = (id, n = 1) => (S.inv[id] || 0) >= n;
 function give(id, n = 1) { S.inv[id] = (S.inv[id] || 0) + n; }
@@ -123,6 +124,10 @@ function moverAt(m, t) { // [x, y, w, dx, dy, period]: swings out and back
 }
 const netT = () => (G.net ? G.net.now() : Date.now()) / 1000;
 // 어려움 장애물, timed on the shared clock so every tablet sees the same thing
+// 심장 박동 (혈관 급류 어려움): the same beat on every tablet
+const beatPh = () => netT() % tune.beat_every;
+const beatOn = () => !!G.map.pulse && beatPh() < 0.35;               // 수축: the surge
+const valveOpen = () => !!G.map.pulse && beatPh() < tune.beat_open; // 판막이 열려 있는 동안
 const blinkPh = i => (netT() + i * 0.7) % 4.2; // gone while ≥ 2.8, flickers from 2.2
 const blinkOff = i => !!(G.map.gim && G.map.gim.blink.includes(i) && blinkPh(i) >= 2.8);
 const orbAt = o => ({ x: o[0] + (o[1] - o[0]) * (0.5 - 0.5 * Math.cos((netT() / o[3] + o[4]) * Math.PI * 2)), y: o[2] });
@@ -214,9 +219,8 @@ function startQuiz() {
     });
   };
   const done = () => {
-    S.quiz = right; S.exp = right * tune.exp_per_answer;
-    while (S.exp >= tune.exp_per_lv * S.lv) { S.exp -= tune.exp_per_lv * S.lv; S.lv++; }
-    $('#qq').innerHTML = `${QUIZ.length}문제 중 <b>${right}</b>개 정답!<br>경험치 <b>${right * tune.exp_per_answer}</b> 획득${S.lv > 1 ? ` · 벌써 <b>Lv.${S.lv}</b>!` : ''}`;
+    S.quiz = right;
+    $('#qq').innerHTML = `${QUIZ.length}문제 중 <b>${right}</b>개 정답!<br>공격력 <b>${atkPower()}</b> <small>(정답이 많을수록 세요 · 이 공격력은 끝까지 그대로예요)</small>`;
     $('#qbar').style.width = '100%'; $('#qn').textContent = '입장 문제 끝';
     $('#qa').innerHTML = '<button class="go">직업 고르러 가기</button>'; $('#qa .go').onclick = startJob;
     events.push({ type: 'quiz', right });
@@ -248,7 +252,7 @@ function jobPanel() { // what this job learns as it levels up; no stats to share
   const P = $('#stats'), J = job(); P.classList.remove('hide');
   P.innerHTML = `<h3 style="color:${J.color}">${J.name}</h3><div class="sk"><b>공격 · 스킬</b><span>${J.skill.name} (MP ${J.skill.mp})</span></div>`
     + `<div class="sk"><b>Lv.5</b><span>${J.move.name} — ${J.move.text}</span></div><div class="sk"><b>Lv.10</b><span>${J.power.name} — ${J.power.text}</span></div>`
-    + `<p class="tip">능력치는 없어요. 레벨이 오르면 HP · MP와 공격력이 조금씩 오르고, Lv.5와 Lv.10에 새 스킬을 배워요.</p><button id="startB" class="go">모험 시작!</button>`;
+    + `<p class="tip">공격력은 입장 문제로 정해졌어요 (<b>${atkPower()}</b>). 레벨이 올라도 공격력은 그대로이고, HP · MP가 늘고 Lv.5와 Lv.10에 새 스킬을 배워요.</p><button id="startB" class="go">모험 시작!</button>`;
   $('#startB').onclick = () => go(Number(sget('bq:ch')) || 1);
 }
 
@@ -456,7 +460,7 @@ function gainExp(n) {
     S.exp -= expNeed(); S.lv++; G.me.hp = maxHp(); G.me.mp = maxMp();
     G.fx.push({ k: 'lv', x: G.me.x, y: G.me.y, t: 0 }); SFX.lvup();
     const learn = S.lv === SKILL_LV.move ? job().move : S.lv === SKILL_LV.power ? job().power : null;
-    G.banner = learn ? { big: `Lv.${S.lv} · 새 스킬 「${learn.name}」!`, small: learn.text, t: 5 } : { big: `레벨 업! Lv.${S.lv}`, small: 'HP · MP · 공격력이 조금 올랐어요', t: 2 };
+    G.banner = learn ? { big: `Lv.${S.lv} · 새 스킬 「${learn.name}」!`, small: learn.text, t: 5 } : { big: `레벨 업! Lv.${S.lv}`, small: `HP · MP가 늘었어요${S.lv < SKILL_LV.power ? ` · 다음 스킬은 Lv.${S.lv < SKILL_LV.move ? SKILL_LV.move : SKILL_LV.power}` : ''}`, t: 2 };
     if (learn) toast(`${S.lv === SKILL_LV.move ? 'Shift' : 'V'} 키 또는 오른쪽 아래 「${learn.name}」 버튼`);
   }
   save(); hud();
@@ -745,6 +749,7 @@ function updateMe(dt) {
     if (now) { m.x += now.x - m.ground.x; m.y = now.y; m.ground = now; } else m.ground = null;
   }
   if (m.ground && m.ground.i >= 0 && blinkOff(m.ground.i)) m.ground = null; // the branch vanished under me
+  if (beatOn() && !m.rope) m.vx += tune.beat_push * (m.ground ? 0.55 : 1) * (1 - beatPh() / 0.35); // 쿵! the blood carries me right
   m.x += m.vx * dt;
   if (m.ground && (m.x < m.ground.x - 4 || m.x > m.ground.x + m.ground.w + 4)) m.ground = null; // walked off the edge
   if (!m.ground) {
@@ -792,6 +797,8 @@ function bossRules(dt, miss) { // what a missing organ system does to me in the 
 const clotX = c => c[0] + (c[2] - c[0]) * (0.5 - 0.5 * Math.cos(netT() / c[3] * Math.PI));
 function valves(m) { // 판막: once through, you cannot go back; it is also where you start again
   const vs = G.map.valves;
+  if (G.map.pulse && !valveOpen()) for (let i = 0; i < vs.length; i++) // shut between beats: wait for 쿵!
+    if (m.cp < i && m.x > vs[i] + 6 && m.x < vs[i] + 34) { m.x = vs[i] + 6; m.vx = Math.min(0, m.vx); /* stand on the floor in front of it */ if (!G.waitT || G.t - G.waitT > 4) { G.waitT = G.t; toast('판막이 닫혀 있어요. 심장이 쿵! 뛸 때 열려요.'); } break; }
   for (let i = vs.length - 1; i >= 0; i--) if (m.x > vs[i] + 20 && m.cp < i) { m.cp = i; toast(i === vs.length - 1 ? '마지막 판막 통과! 조직 세포가 보여요.' : `판막 ${i + 1} 통과! 혈액은 거꾸로 흐를 수 없어요.`); SFX.pick(); }
   if (m.cp >= 0 && m.x < vs[m.cp] + 12) { m.x = vs[m.cp] + 12; m.vx = Math.max(0, m.vx); }
 }
@@ -821,7 +828,7 @@ function attack(kind) { // false: attack · true: skill (X) · 'power': the Lv.1
   if (kind) m.mp -= A.mp;
   if (kind === 'power') m.powCd = A.cd; else if (kind) m.skillCd = A.cd;
   m.atkCd = Math.max(m.atkCd, A.cd); m.atkT = 0; m.at = Math.round(netT() * 1000); A.magic ? SFX.magic() : SFX.swing();
-  const base = tune.dmg_base + S.lv * tune.dmg_per_lv, boost = stage() >= 5 ? 1 + tune.energy_bonus : 1;
+  const base = atkPower(), boost = stage() >= 5 ? 1 + tune.energy_bonus : 1;
   const targets = G.mons.filter(mo => !mo.dead && (mo.x - m.x) * m.f > -30 - MONS[mo.k].w / 2 && Math.abs(mo.x - m.x) - MONS[mo.k].w * 0.4 < A.range && Math.abs((mo.y - MONS[mo.k].h / 2) - (m.y - 30)) < MONS[mo.k].h / 2 + 50)
     .sort((a, b) => Math.abs(a.x - m.x) - Math.abs(b.x - m.x)).slice(0, A.hits);
   const shoot = (tg, delay) => {
@@ -894,7 +901,7 @@ const told = () => (stage() >= QUESTS.length - 1 ? !!S.fl.linked : S.fl.told ===
 const portalOpen = p => !p.for || (p.for.includes(stage()) && told());
 function pickLevel(to, goTo) { // 쉬움 / 어려움, chosen at the portal
   const box = $('#pick'); box.classList.remove('hide'); G.modal = true;
-  box.innerHTML = `<div class="cin" style="--c:#3b7fb5"><small>${esc(MAPS[to].name)}</small><h2>난이도를 골라요</h2><p>어려움에는 밀어내는 먼지 덩어리, 사라지는 발판, 아래에서 솟구치는 바람이 있어요. 끝까지 가면 보너스 경험치!</p><div class="row"><button id="pkE" class="go">쉬움</button><button id="pkH" class="go hard">어려움</button></div><button id="pkX" class="tip">취소</button></div>`;
+  box.innerHTML = `<div class="cin" style="--c:#3b7fb5"><small>${esc(MAPS[to].name)}</small><h2>난이도를 골라요</h2><p>${MAPS[to + 'H'].pulse ? '어려움: 심장이 쿵! 뛸 때만 판막이 열리고, 뛸 때마다 혈액이 오른쪽으로 세게 밀어내요. 혈전도 더 많아요.' : '어려움에는 밀어내는 먼지 덩어리, 사라지는 발판, 아래에서 솟구치는 바람이 있어요.'} 끝까지 가면 보너스 경험치!</p><div class="row"><button id="pkE" class="go">쉬움</button><button id="pkH" class="go hard">어려움</button></div><button id="pkX" class="tip">취소</button></div>`;
   const close = () => { box.classList.add('hide'); G.modal = false; };
   $('#pkE').onclick = () => { close(); goTo(to); }; $('#pkH').onclick = () => { close(); goTo(to + 'H'); }; $('#pkX').onclick = close;
 }
@@ -902,6 +909,7 @@ function afterPortal(id) {
   const base = id.replace(/H$/, '');
   if (base === 'lung' && stage() === 2) toast('기관지 나무 꼭대기까지 점프로 올라가요! 떨어지면 아래 가지부터 다시.');
   if (base === 'vessel' && stage() === 3 && !S.fl.loaded) toast('먼저 하트 선장(심장)에게 말을 걸어 짐을 실어요.');
+  else if (MAPS[id] && MAPS[id].pulse) toast('쿵! 심장이 뛸 때만 판막이 열리고, 혈액이 오른쪽으로 밀어 줘요. 박동에 맞춰 뛰어요!');
   if (id === 'lair') { const miss = bossMissing(); G.banner = { big: '세균 대왕의 소굴', small: miss.length ? `어딘가 몸이 이상해요… (${miss.map(r => r.name).join(' · ')})` : '모든 기관계가 제 일을 해요. 파티와 함께 무찔러요!', t: 5, boss: true }; }
 }
 function npcNear() { return G.map.npcs.find(([, x, y]) => Math.abs(x - G.me.x) < 70 && Math.abs(y - G.me.y) < 60); }
@@ -995,7 +1003,7 @@ function toast(s) { const t = $('#toast'); t.textContent = s; t.classList.add('o
 function hud() {
   if (!S || !G.me) return;
   const m = G.me, q = stage(), Q = QUESTS[q] || QUESTS[QUESTS.length - 1];
-  $('#hLv').textContent = `Lv.${S.lv}`; $('#hName').textContent = `${S.name} · ${job().name}`;
+  $('#hLv').textContent = `Lv.${S.lv}`; $('#hName').textContent = `${S.name} · ${job().name} · 공격 ${atkPower()}`;
   hudBars();
   $('#hExp').style.width = `${(S.exp / expNeed()) * 100}%`; $('#hExpT').textContent = `EXP ${S.exp} / ${expNeed()}`;
   let prog = '';
@@ -1050,7 +1058,12 @@ function drawPlay() {
     drawPlat(ctx, map, p.x, p.y, p.w, p.k === 'ground' ? 'ground' : p.k);
   }
   if (map.movers) for (const mv of map.movers) { const p = moverAt(mv, netT()); drawPlat(ctx, map, p.x, p.y, p.w, 'mover'); }
-  if (map.valves) map.valves.forEach((v, i) => drawValve(ctx, v, groundBelow(v + 20, -9999), G.me.cp >= i, t));
+  if (map.valves) map.valves.forEach((v, i) => drawValve(ctx, v, groundBelow(v + 20, -9999), G.me.cp >= i || valveOpen(), t));
+  if (map.pulse && beatOn()) { // the surge: streaks of blood rushing right
+    const k = 1 - beatPh() / 0.35; ctx.save(); ctx.globalAlpha = 0.55 * k; ctx.strokeStyle = '#ffd0d4'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    for (let i = 0; i < 18; i++) { const x = cam.x + ((i * 211 + beatPh() * 2400) % (W + 200)) - 100, y = cam.y + 120 + (i * 97) % (H - 200); ctx.beginPath(); ctx.moveTo(x - 70, y); ctx.lineTo(x, y); ctx.stroke(); }
+    ctx.restore();
+  }
   for (const p of map.portals) { if (!portalShown(p)) continue; const py = p.y || map.ground || groundBelow(p.x, 0); const op = portalOpen(p); if (!op) ctx.globalAlpha = 0.45; drawPortal(ctx, p.x, py, t); ctx.globalAlpha = 1; if (p.label) tag(p.label + (op ? '' : ' (잠김)'), p.x, py - 112, !op ? '#555' : p.boss ? '#8a1f2a' : '#1f5f8a'); }
   for (const [id, x, y] of map.npcs) { drawNpc(ctx, id, x, y, t, lit); tag(NPCS[id].name, x, y + 16, '#2d6a3e'); if (questMark(id)) bang(x, y - 110, t); }
   if (map.clots) for (const c of map.clots) drawClot(ctx, clotX(c), c[1], t);
@@ -1085,6 +1098,13 @@ function drawPlay() {
   }
   if (map.hazard) drawBlood(ctx, map, cam.x, cam.y, t, W);
   ctx.restore();
+  if (map.pulse) { // the heart: a red pulse round the edge, and a heart that beats in the corner
+    const ph = beatPh(), k = Math.max(0, 1 - ph / 0.45);
+    if (k > 0) { const g = ctx.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 0.85); g.addColorStop(0, 'rgba(200,0,30,0)'); g.addColorStop(1, `rgba(200,0,30,${0.45 * k})`); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); }
+    const s = 1 + 0.25 * k, hx = W / 2, hy = 46; ctx.save(); ctx.translate(hx, hy); ctx.scale(s, s);
+    ctx.beginPath(); ctx.moveTo(0, 14); ctx.bezierCurveTo(-30, -6, -18, -30, 0, -14); ctx.bezierCurveTo(18, -30, 30, -6, 0, 14); fillS(ctx, '#e0283c', 3); ctx.restore();
+    text(valveOpen() ? '쿵! 판막 열림' : '판막 닫힘', hx, hy + 28, 16, valveOpen() ? '#ffe0e4' : '#cfd6e6', 'center', OL);
+  }
   if (map.theme === 'town' && !lit) { ctx.fillStyle = 'rgba(20,24,50,.32)'; ctx.fillRect(0, 0, W, H); }
   const b = bossNow(); if (b) bossBar(b);
   const miss = bossMissing(); if (miss.length && b) debuffs(miss);
@@ -1355,6 +1375,7 @@ function step() {
   if (G.scene === 'play') {
     updateMe(STEP); updateShots(STEP); trialTick();
     if (G.host) hostTick(STEP);
+    if (G.map.pulse) { const n = Math.floor(netT() / tune.beat_every); if (n !== G.beatN) { G.beatN = n; tone(70, 0.18, 'sine', 0.22, 0.6); setTimeout(() => tone(60, 0.14, 'sine', 0.16, 0.6), 160); } }
     else for (const mo of G.mons) if (mo.tx !== undefined) mo.x += (mo.tx - mo.x) * 0.2;
     for (const mo of G.mons) mo.flash = Math.max(0, mo.flash - STEP);
     for (const d of G.drops) { d.t += STEP; if (d.y < d.gy || d.vy < 0) { d.vy += tune.gravity * STEP; d.y = Math.min(d.gy, d.y + d.vy * STEP); } }

@@ -154,9 +154,11 @@ hardOf('lung', {
     geysers: LUNG_FLOORS.slice(0, 4).flatMap((y, s) => [[s % 2 ? 1050 : 450, y, 330, 5, s * 1.3], [s % 2 ? 450 : 1050, y, 330, 5, 2.5 + s * 1.3]]),
   },
 });
+// 혈관 급류 (어려움) is not another 기관지 나무: the heart beats (쿵!). Valves open only on the beat, and every beat a surge
+// of blood carries you to the right (the way blood flows) — jump with it to clear gaps, or be pushed into a clot.
 hardOf('vessel', {
   clots: [...MAPS.vessel.clots, [520, 690, 630, 1.4], [2860, 700, 3100, 1.6]],
-  gim: { orbs: [[1000, 1500, 560, 3.2, 0], [2300, 2800, 520, 3.6, 1], [3200, 3700, 470, 3.0, 2]], blink: [2, 5, 7, 10], geysers: [[1180, 830, 260, 4.5, 0], [2650, 830, 300, 4, 1.5], [3450, 830, 300, 4.2, 3]] },
+  pulse: true,
 });
 
 // ---- NPC ------------------------------------------------------------------------------------

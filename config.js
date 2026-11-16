@@ -13,9 +13,12 @@ window.CONFIG = {
   climb: { value: 160, min: 60, max: 300, step: 10 },
   fall_max: { value: 1000, min: 500, max: 1600, step: 50 },
   // fighting
-  exp_per_answer: { value: 6, min: 0, max: 30, step: 1 },   // EXP per correct entry answer (no stat points any more)
-  dmg_base: { value: 30, min: 1, max: 80, step: 1 },        // damage = base + lv × per_lv (levels give skills, not stats)
-  dmg_per_lv: { value: 4, min: 0, max: 20, step: 0.5 },
+  dmg_base: { value: 24, min: 1, max: 80, step: 1 },        // attack = base + correct entry answers × per_answer; levels never add to it
+  dmg_per_answer: { value: 3.6, min: 0, max: 20, step: 0.2 }, // 0개 24 · 5개 42 · 10개 60
+  // 혈관 급류 (어려움): the heart beats; each beat opens the valves and the blood shoves you along
+  beat_every: { value: 1.8, min: 1, max: 4, step: 0.1 },    // seconds between beats
+  beat_open: { value: 0.7, min: 0.2, max: 2, step: 0.05 },  // valves stay open this long after a beat
+  beat_push: { value: 420, min: 0, max: 900, step: 10 },    // px/s the surge carries you toward the right
   energy_bonus: { value: 0.3, min: 0, max: 1, step: 0.05 },  // +30% damage after 세포 호흡
   hp_base: { value: 60, min: 20, max: 200, step: 5 },
   hp_per_lv: { value: 20, min: 5, max: 60, step: 1 },
