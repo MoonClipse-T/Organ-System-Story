@@ -63,7 +63,8 @@ const ITEMS = {
 
 // ---- 맵 -------------------------------------------------------------------------------------
 // plats: [x, y, w] one-way footholds (y = the top you stand on); ground is solid. ropes: [x, top, bottom].
-// portals: { x, y, to, tx, need (party stage), pick (asks 쉬움/어려움), boss }. npcs: [id, x, y]. spawns: { k, plat, n }.
+// portals: { x, y, to, tx, for (the quest steps it is open for), pick (asks 쉬움/어려움), boss }. npcs: [id, x, y]. spawns: { k, plat, n }.
+// A town portal opens only for its own mission, and only after the chief has said where to go (S.fl.told).
 // Jump reach is about 105 px up, so every first tier sits 95 px over the ground and higher tiers hang on ropes.
 const LUNG_FLOORS = [3300, 2560, 1820, 1080, 340];
 function lungPlats() { // the 기관지 나무 jump quest: 4 stages, each starts on a full-width branch floor
@@ -92,11 +93,11 @@ const MAPS = {
     plats: [[360, 705, 240], [700, 610, 200], [1460, 705, 280], [1860, 610, 200]],
     ropes: [[790, 610, 800], [1950, 610, 800]],
     portals: [
-      { x: 140, to: 'digest', tx: 'start', need: 1, label: '소화계 · 소화관 동굴' },
-      { x: 1700, to: 'lung', tx: 'start', need: 2, pick: true, label: '호흡계 · 기관지 나무' },
-      { x: 2100, to: 'vessel', tx: 'start', need: 3, pick: true, label: '순환계 · 혈관 급류' },
-      { x: 2460, to: 'kidney', tx: 'start', need: 5, label: '배설계 · 콩팥 정수장' },
-      { x: 960, to: 'lair', tx: 'start', boss: true, label: '세균 소굴 (보스)' },
+      { x: 140, to: 'digest', tx: 'start', for: [1], label: '소화계 · 소화관 동굴' },
+      { x: 1700, to: 'lung', tx: 'start', for: [2, 5], pick: true, label: '호흡계 · 기관지 나무' },
+      { x: 2100, to: 'vessel', tx: 'start', for: [3], pick: true, label: '순환계 · 혈관 급류' },
+      { x: 2460, to: 'kidney', tx: 'start', for: [5], label: '배설계 · 콩팥 정수장' },
+      { x: 960, to: 'lair', tx: 'start', for: [6], boss: true, label: '세균 소굴 (보스)' },
     ],
     npcs: [['chief', 520, 800], ['mito', 1150, 800]],
     spawns: [],
@@ -210,6 +211,15 @@ const SYS = {
   vessel: { name: '순환계', color: '#d9463b', text: '영양소와 산소를 온몸의 세포로 운반하고, 노폐물과 이산화 탄소를 배설계와 호흡계로 운반해요.' },
   cell: { name: '세포 호흡', color: '#f0a020', text: '세포(미토콘드리아)에서 영양소와 산소를 이용해 에너지를 얻는 과정이에요. 이때 물과 이산화 탄소 같은 노폐물이 생겨요. 얻은 에너지는 체온 유지(약 60 %), 두뇌 활동·근육 운동·소리 내기·생장(약 40 %)에 쓰여요.' },
   kidney: { name: '배설계', color: '#8a6fd0', text: '세포 호흡 결과 생긴 노폐물(요소 등)을 콩팥에서 걸러 오줌의 형태로 몸 밖으로 내보내요.' },
+};
+
+// ---- 촌장의 안내: 미션을 마치고 마을로 돌아오면 다음에 갈 곳을 알려 줌 (이걸 들어야 그 포탈이 열림) ------------
+const GUIDE = {
+  1: ['먼저 소화계부터! 마을 왼쪽 끝 「소화계 · 소화관 동굴」 포탈로 가.', '녹말 슬라임, 단백질 꾸물이, 지방 방울을 잡아 잘게 분해하고, 동굴 끝 융털 문지기에게 가면 돼.'],
+  2: ['영양소를 흡수했구나! 이제 세포 호흡에 필요한 산소가 있어야 해.', '마을 오른쪽 「호흡계 · 기관지 나무」 포탈로 가서 꼭대기까지 올라가 폐포 요정을 만나!'],
+  3: ['영양소도 산소도 생겼어. 그런데 세포까지 어떻게 보내지?', '「순환계 · 혈관 급류」 포탈로 가서 하트 선장에게 짐을 싣고, 혈관을 건너 조직 세포에게 배달해 줘!'],
+  4: ['배달 완료! 이제 세포가 영양소와 산소로 에너지를 만들 차례야.', '포탈은 필요 없어. 마을 가운데 미토콘드리아 발전소의 미토 발전소장에게 가 봐!'],
+  5: ['에너지가 생겼지만 이산화 탄소와 요소 같은 노폐물도 생겼어.', '「호흡계 · 기관지 나무」 아래 가로막 아저씨에게 이산화 탄소를 내쉬고, 「배설계 · 콩팥 정수장」에서 요소 유령을 잡아 네프론 정수기에게 가!'],
 };
 
 // ---- 대사 -----------------------------------------------------------------------------------

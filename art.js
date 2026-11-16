@@ -42,7 +42,7 @@ function drawDoll(c, x, y, f, job, look, a) {
   const J = JOBS[job] || JOBS.warrior, O = JOB_LOOK[job] || JOB_LOOK.warrior, P = k => SP[`${job}-${k}`];
   const walk = a.st === 'walk' ? Math.sin(a.t * 12) : 0, air = a.st === 'jump', climb = a.st === 'climb', atk = a.atk >= 0 ? a.atk : -1;
   c.save(); c.translate(x, y);
-  if (!climb) shadow(c, 0, 0, 16);
+  if (!climb && !a.flat) shadow(c, 0, 0, 16);
   c.scale(f, 1);
   const bob = a.st === 'walk' ? Math.abs(Math.sin(a.t * 12)) * 2 : a.st === 'stand' ? Math.sin(a.t * 3) * 0.8 : 0;
   c.translate(0, -bob);
@@ -66,11 +66,15 @@ function drawDoll(c, x, y, f, job, look, a) {
   c.restore();
 }
 function drawHero(c, x, y, f, job, look, a) {
+  if (a.st === 'prone') { // 엎드리기: the same figure laid flat, head forward, close to the ground
+    c.save(); c.translate(x, y); shadow(c, 0, 0, 30); c.scale(f, 1); c.translate(-26, -11); c.rotate(Math.PI / 2);
+    drawHero(c, 0, 0, 1, job, look, { ...a, st: 'stand', flat: 1, t: 0 }); c.restore(); return;
+  }
   if (look.g && dollReady(look, job)) return drawDoll(c, x, y, f, job, look, a);
   const J = JOBS[job] || JOBS.warrior, hair = HAIR[(look.hair || 0) % HAIR.length], skin = SKIN[(look.skin || 0) % SKIN.length];
   const walk = a.st === 'walk' ? Math.sin(a.t * 12) : 0, air = a.st === 'jump', climb = a.st === 'climb';
   c.save(); c.translate(x, y);
-  if (!climb) shadow(c, 0, 0, 16);
+  if (!climb && !a.flat) shadow(c, 0, 0, 16);
   c.scale(f, 1);
   const bob = a.st === 'walk' ? Math.abs(Math.sin(a.t * 12)) * 2 : a.st === 'stand' ? Math.sin(a.t * 3) * 0.8 : 0;
   c.translate(0, -bob);

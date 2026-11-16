@@ -513,14 +513,15 @@ function onParty(pid, P) {
   orders(was, 'wipe'); orders(was, 'call');
   refreshParty(); hud(); save();
 }
-function stepUp(from, to) { // the teacher passed us: cards for every step we cleared
+function stepUp(from, to) { // a mission is done: back to town, cards for every step cleared, then the chief says where next
   S.fl.seen = to - 1; delete S.fl.loaded; delete S.fl.exhaled; delete S.fl.urine;
+  if (G.mapId !== 'town') { enterMap('town', 640); G.me.hp = Math.max(G.me.hp, Math.round(maxHp() * 0.6)); }
   const cards = QUESTS.slice(from, to).filter(Q => Q.sys).map(Q => Q.sys);
   SFX.quest(); G.fx.push({ k: 'lv', x: G.me.x, y: G.me.y, t: 0 });
   const next = () => {
     const s = cards.shift(); if (s) { card(s, next); return; }
-    if (to >= QUESTS.length - 1) { G.banner = { big: '세균 소굴이 열렸어요!', small: '마을 가운데 보스 포탈 · 선생님이 답을 모두 확인하면 들어갈 수 있어요.', t: 5, boss: true }; SFX.alarm(); }
-    else toast(`다음 미션: ${QUESTS[to].go}`);
+    if (to >= QUESTS.length - 1) { G.banner = { big: '마지막 미션!', small: '셀리 촌장에게 이야기를 듣고 세균 소굴 포탈로 · 선생님이 답을 모두 확인해야 들어갈 수 있어요.', t: 5, boss: true }; SFX.alarm(); }
+    else { G.banner = { big: '미션 완료! 세포 마을로', small: '셀리 촌장(!)에게 다음에 갈 곳을 들어요.', t: 4 }; toast('셀리 촌장에게 말을 걸면 다음에 갈 곳을 알려 줘요.'); }
   };
   next(); save();
 }
@@ -637,13 +638,14 @@ function answerBox(q0, again) { // the leader writes the party's answer: once, t
   }
   const box = $('#answer'), g = grOf(q), old = subOf(q);
   box.classList.remove('hide'); G.modal = true;
-  box.innerHTML = `<div class="cin" style="--c:${SYS[Q.sys].color}"><small>${SYS[Q.sys].name} · ${again ? '다시 쓰기' : '파티 답안 · <b>딱 한 번</b>만 낼 수 있어요'}</small><h2>${esc(Q.title)}</h2><p class="qask">${esc(Q.ask)}</p>`
+  box.innerHTML = `<div class="cin" style="--c:${SYS[Q.sys].color}"><small>${SYS[Q.sys].name} · ${again ? '다시 쓰기' : '파티 답안'}</small><h2>${esc(Q.title)}</h2>`
+    + `<p class="once">${again ? '다시 낼 수 있는 기회도 <b>1회</b>예요.' : '답은 <b>1회</b>만 낼 수 있어요. 낸 뒤에는 고칠 수 없어요.'} 글자 수 제한은 없으니 아는 만큼 자세히 써요.</p><p class="qask">${esc(Q.ask)}</p>`
     + (again && old ? `<p class="back">지난 답: “${esc(old.a)}”${g && g.c ? `<br>선생님: ${esc(g.c)}` : ''}</p>` : '')
-    + `<textarea id="ansT" rows="4" maxlength="400" placeholder="교과서를 보며 파티원과 의논해서 써요. 틀리면 보스전에서 이 기관계가 말썽을 부려요!"></textarea><div class="row"><button id="ansX">나중에</button><button id="ansGo" class="go">${again ? '다시 내기' : '답 내기'}</button></div></div>`;
+    + `<textarea id="ansT" rows="5" placeholder="교과서를 보며 파티원과 의논해서 써요. 틀리면 보스전에서 이 기관계가 말썽을 부려요!"></textarea><div class="row"><button id="ansX">나중에</button><button id="ansGo" class="go">${again ? '다시 내기' : '답 내기'}</button></div></div>`;
   $('#ansX').onclick = () => { box.classList.add('hide'); G.modal = false; };
   $('#ansGo').onclick = () => {
-    const a = $('#ansT').value.trim(); if (a.length < 4) { $('#ansT').placeholder = '조금 더 써 주세요!'; return; }
-    if (!again && !confirm('이 답으로 낼까요? 다시 고칠 수 없어요.')) return;
+    const a = $('#ansT').value.trim(); if (!a) { $('#ansT').placeholder = '답을 써 주세요!'; return; }
+    if (!confirm(`답은 1회만 낼 수 있어요. 이 답으로 낼까요?\n\n${a}`)) return;
     box.classList.add('hide'); G.modal = false;
     const rec = { a, by: S.name, t: G.net ? G.net.now() : Date.now(), n: ((old && old.n) || 1) + (again ? 1 : 0) };
     if (G.net && S.pid) {
@@ -667,7 +669,7 @@ function trialNote() {
   if (v) { S.fl.trials[tr.id] = v.ok ? 'ok' : 'no'; closeTrial(); v.ok ? trialPass() : trialFail('운영자가 탈락시켰어요!'); return; }
   G.trial = tr; const box = $('#trial'); box.classList.remove('hide'); SFX.alarm();
   box.innerHTML = `<div class="tin"><small>⚠ 운영자 시련 · 거짓말 탐지기</small><h2>${esc(tr.q)}</h2><div class="tbar"><i id="trBar"></i></div><b id="trLeft"></b>`
-    + (ans ? `<p class="sent">${esc(ans.by)}님이 답했어요: “${esc(ans.a)}”<br>운영자 판정을 기다리는 중…</p>` : `<textarea id="trT" rows="3" maxlength="300" placeholder="파티원 누구든 답을 써요"></textarea><button id="trGo" class="go">답하기</button>`) + '</div>';
+    + (ans ? `<p class="sent">${esc(ans.by)}님이 답했어요: “${esc(ans.a)}”<br>운영자 판정을 기다리는 중…</p>` : `<textarea id="trT" rows="3" placeholder="파티원 누구든 답을 써요"></textarea><button id="trGo" class="go">답하기</button>`) + '</div>';
   if (!ans) $('#trGo').onclick = () => { const a = $('#trT').value.trim(); if (!a) return; if (G.net) G.net.set(`pty/${S.pid}/ta/${tr.id}`, { a, by: S.name, t: G.net.now() }); };
 }
 function trialTick() {
@@ -726,9 +728,11 @@ function updateMe(dt) {
     const rp = map.ropes.find(r => Math.abs(r[0] - m.x) < 18 && (U ? m.y > r[1] + 4 && m.y <= r[2] + 4 : Math.abs(m.y - r[1]) < 4));
     if (rp) { m.rope = rp; m.x = rp[0]; m.ground = null; if (D) m.y += 6; return; }
   }
+  m.prone = !frozen() && D && !!m.ground && m.push <= 0 && m.hurt <= 0; // 엎드리기: ▼ on the ground, still turns with ◀ ▶
   if (m.hurt <= 0) {
-    const want = frozen() || m.atkT >= 0 && m.ground ? 0 : (R ? 1 : 0) - (L ? 1 : 0);
+    const want = frozen() || m.prone || m.atkT >= 0 && m.ground ? 0 : (R ? 1 : 0) - (L ? 1 : 0);
     m.vx = want * tune.walk * slow; if (want) m.f = want;
+    if (m.prone && (L || R)) m.f = R ? 1 : -1;
   }
   if (m.push > 0) m.vx = m.pvx; // 대쉬 · 백대쉬 · 더블 점프: the skill moves me, not the stick
   if (!frozen() && isHit('jump') && m.ground) {
@@ -754,14 +758,14 @@ function updateMe(dt) {
   if (map.valves) valves(m);
   if (map.hazard && m.y > map.hazard + 20) fallBack(true);
   if (m.y > map.h + 300) fallBack(false);
-  m.st = m.hurt > 0 ? 'hurt' : !m.ground ? 'jump' : Math.abs(m.vx) > 1 ? 'walk' : 'stand';
+  m.st = m.hurt > 0 ? 'hurt' : !m.ground ? 'jump' : m.prone && m.ground ? 'prone' : Math.abs(m.vx) > 1 ? 'walk' : 'stand';
   if (map.gim) hazards(m);
   if (m.inv <= 0 && !G.dead && !(m.push > 0 && J.move.kind === 'dash')) { // touching monsters, clots, spores (not while dashing)
     for (const mo of G.mons) {
       if (mo.dead) continue; const M = MONS[mo.k];
       if (Math.abs(mo.x - m.x) < M.w / 2 + 8 && m.y > mo.y - M.h - 30 && m.y < mo.y + 20) { hurt(M.dmg, mo.x < m.x ? 1 : -1); break; }
     }
-    if (map.clots) for (const c of map.clots) { const x = clotX(c); if (Math.abs(x - m.x) < 28 && Math.abs(m.y - c[1]) < 40) { hurt(8, x < m.x ? 1 : -1); break; } }
+    if (map.clots) for (const c of map.clots) { const x = clotX(c); if (Math.abs(x - m.x) < (m.prone ? 40 : 28) && Math.abs(m.y - c[1]) < 40) { hurt(8, x < m.x ? 1 : -1); break; } }
     for (const s of spores()) if (s.ph > SPORE.warn + SPORE.fall - 0.05 && !G.sporeHit[s.id] && Math.abs(s.x - m.x) < 36 && Math.abs(m.y - s.gy) < 50) { G.sporeHit[s.id] = 1; hurt(MONS.boss.dmg, s.x < m.x ? 1 : -1); break; }
   }
   for (const d of G.drops) if (d.t > 0.4 && Math.abs(d.x - m.x) < 30 && Math.abs(d.y - m.y) < 50 && !d.got) { // drops I walk over
@@ -771,7 +775,8 @@ function updateMe(dt) {
 }
 function hazards(m) { // 어려움: dust balls shove, blasts from below knock you off
   if (m.inv > 0) return;
-  for (const o of G.map.gim.orbs) { const p = orbAt(o); if (Math.abs(p.x - m.x) < 32 && Math.abs(p.y - (m.y - 30)) < 40) { shove(p.x < m.x ? 1 : -1, 0); return; } }
+  const body = m.prone ? m.y - 10 : m.y - 30, tall = m.prone ? 22 : 40; // lying flat, the dust balls fly over
+  for (const o of G.map.gim.orbs) { const p = orbAt(o); if (Math.abs(p.x - m.x) < 32 && Math.abs(p.y - body) < tall) { shove(p.x < m.x ? 1 : -1, 0); return; } }
   for (const g of G.map.gim.geysers) { const s = geyserAt(g); if (s.on && Math.abs(g[0] - m.x) < 30 && m.y <= g[1] + 2 && m.y >= g[1] - s.h) { shove(m.x < g[0] ? -1 : 1, 5); return; } }
 }
 function shove(dir, dmg) {
@@ -822,7 +827,7 @@ function attack(kind) { // false: attack · true: skill (X) · 'power': the Lv.1
   const shoot = (tg, delay) => {
     const dmg = Math.max(1, Math.round(base * A.mult * boost * (0.85 + rng() * 0.3)));
     const tx = tg ? tg.x : m.x + m.f * A.range * 0.7, ty = tg ? tg.y - MONS[tg.k].h / 2 : m.y - 36;
-    if (A.shot) G.shots.push({ k: A.shot, x: m.x + m.f * 20, y: m.y - 36, tx, ty, t: -delay, f: m.f, tg, dmg });
+    if (A.shot) G.shots.push({ k: A.shot, x: m.x + m.f * (m.prone ? 40 : 20), y: m.y - (m.prone ? 14 : 36), tx, ty, t: -delay, f: m.f, tg, dmg });
     else if (A.magic) G.shots.push({ k: 'magic', mg: A.magic, x: tx, y: ty, tx, ty, t: -delay - 0.08, f: m.f, tg, dmg });
     else if (tg) landHit(tg, dmg);
   };
@@ -877,13 +882,16 @@ function tryPortal() {
   const m = G.me, p = G.map.portals.find(p => portalShown(p) && Math.abs(p.x - m.x) < 42 && Math.abs((p.y || G.map.ground || groundBelow(p.x, 0)) - m.y) < 40);
   if (!p) return false;
   if (G.mapId === 'town' && !S.fl.pro) { toast('먼저 셀리 촌장에게 이야기를 들어요.'); return true; }
-  if (p.need && stage() < p.need) { toast(`아직 갈 수 없어요. 지금 할 일: ${QUESTS[stage()].go}`); return true; }
+  if (p.for && !told()) { toast('먼저 셀리 촌장에게 다음에 갈 곳을 들어요.'); return true; }
+  if (p.for && !p.for.includes(stage())) { toast(`지금은 이 포탈로 갈 수 없어요. 지금 할 일: ${QUESTS[stage()].go}`); return true; }
   if (p.boss && ungraded().length) { toast(`선생님이 아직 확인하지 않은 답이 ${ungraded().length}개 있어요. 확인이 끝나면 들어갈 수 있어요!`); return true; }
   const goTo = id => { if (G.mapId === 'town') leaveTown(); SFX.portal(); enterMap(id, p.tx === 'start' ? 'start' : p.tx); afterPortal(id); };
   if (p.pick) pickLevel(p.to, goTo); else goTo(p.to);
   return true;
 }
 function portalShown(p) { return !p.boss || stage() >= QUESTS.length - 1; }
+const told = () => (stage() >= QUESTS.length - 1 ? !!S.fl.linked : S.fl.told === stage()); // the chief has said where to go now
+const portalOpen = p => !p.for || (p.for.includes(stage()) && told());
 function pickLevel(to, goTo) { // 쉬움 / 어려움, chosen at the portal
   const box = $('#pick'); box.classList.remove('hide'); G.modal = true;
   box.innerHTML = `<div class="cin" style="--c:#3b7fb5"><small>${esc(MAPS[to].name)}</small><h2>난이도를 골라요</h2><p>어려움에는 밀어내는 먼지 덩어리, 사라지는 발판, 아래에서 솟구치는 바람이 있어요. 끝까지 가면 보너스 경험치!</p><div class="row"><button id="pkE" class="go">쉬움</button><button id="pkH" class="go hard">어려움</button></div><button id="pkX" class="tip">취소</button></div>`;
@@ -910,10 +918,12 @@ function talk(id) {
     return true;
   };
   if (id === 'chief') {
-    if (!S.fl.pro) return say(TALK.prologue, () => { S.fl.pro = 1; save(); hud(); SFX.quest(); toast('퀘스트 시작! 파티를 만들려면 왼쪽 위 [파티 · 친구]. 혼자 가도 괜찮아요.'); });
+    if (!S.fl.pro) return say(TALK.prologue, () => { S.fl.pro = 1; S.fl.told = 1; save(); hud(); SFX.quest(); toast('퀘스트 시작! 파티를 만들려면 왼쪽 위 [파티 · 친구]. 혼자 가도 괜찮아요.'); });
     if (Q.id === 'boss' && !S.fl.linked) return say(TALK.link, () => { S.fl.linked = 1; save(); showLinks(); hud(); });
     if (Q.id === 'boss') return say(TALK.free);
-    return say([`지금 할 일: ${Q.go}`, canFormParty() ? '파티는 마을에서만 만들 수 있어. 왼쪽 위 [파티 · 친구]를 눌러 친구를 초대해 봐 (최대 4명).' : '파티원 모두가 끝내야 다음으로 갈 수 있어. 서로 도와줘!']);
+    const fresh = S.fl.told !== q, guide = GUIDE[q] || [`지금 할 일: ${Q.go}`];
+    return say([...guide, canFormParty() ? '파티는 마을에서만 만들 수 있어. 왼쪽 위 [파티 · 친구]를 눌러 친구를 초대해 봐 (최대 4명).' : '파티원 모두가 끝내야 다음으로 갈 수 있어. 서로 도와줘!'],
+      () => { if (fresh) { S.fl.told = q; save(); hud(); SFX.pick(); toast('그 포탈이 열렸어요!'); } });
   }
   if (atQuest && turnIn()) return;
   if (id === 'villi') {
@@ -1004,6 +1014,7 @@ function hud() {
     state = ug.length ? `<span class="wait">선생님이 답을 확인하는 중 (${ug.length}개 남음)</span>` : '<span class="done">세균 소굴 포탈로!</span>';
     if (rw.length) state += rw.map(k => isLeader() ? `<button class="go small" data-rw="${k}">다시 쓰기: ${SYS[QUESTS[k].sys].name}</button>` : `<span class="back">다시 써야 해요: ${SYS[QUESTS[k].sys].name}</span>`).join('');
   }
+  if (S.fl.pro && !told()) { prog = ''; state = '<span class="wait">셀리 촌장에게 가서 다음에 갈 곳 듣기</span>'; }
   $('#quest').innerHTML = `<b>${S.fl.pro ? (Q.id === 'boss' ? '최종 · ' : `퀘스트 ${q} · `) : ''}${Q.title}</b><p>${S.fl.pro ? Q.go : '셀리 촌장에게 말 걸기'}</p>${prog}${state}`;
   const qa = $('#qAns'); if (qa) qa.onclick = () => answerBox();
   $('#quest').querySelectorAll('[data-rw]').forEach(b => b.onclick = () => answerBox(+b.dataset.rw, true));
@@ -1040,7 +1051,7 @@ function drawPlay() {
   }
   if (map.movers) for (const mv of map.movers) { const p = moverAt(mv, netT()); drawPlat(ctx, map, p.x, p.y, p.w, 'mover'); }
   if (map.valves) map.valves.forEach((v, i) => drawValve(ctx, v, groundBelow(v + 20, -9999), G.me.cp >= i, t));
-  for (const p of map.portals) { if (!portalShown(p)) continue; const py = p.y || map.ground || groundBelow(p.x, 0); drawPortal(ctx, p.x, py, t); if (p.label) tag(p.label + (p.need && stage() < p.need ? ' 🔒' : ''), p.x, py - 112, p.boss ? '#8a1f2a' : p.need && stage() < p.need ? '#555' : '#1f5f8a'); }
+  for (const p of map.portals) { if (!portalShown(p)) continue; const py = p.y || map.ground || groundBelow(p.x, 0); const op = portalOpen(p); if (!op) ctx.globalAlpha = 0.45; drawPortal(ctx, p.x, py, t); ctx.globalAlpha = 1; if (p.label) tag(p.label + (op ? '' : ' (잠김)'), p.x, py - 112, !op ? '#555' : p.boss ? '#8a1f2a' : '#1f5f8a'); }
   for (const [id, x, y] of map.npcs) { drawNpc(ctx, id, x, y, t, lit); tag(NPCS[id].name, x, y + 16, '#2d6a3e'); if (questMark(id)) bang(x, y - 110, t); }
   if (map.clots) for (const c of map.clots) drawClot(ctx, clotX(c), c[1], t);
   if (map.gim) {
@@ -1106,6 +1117,7 @@ function drawPlant(lit) { // the 미토콘드리아 발전소 in town, by 미토
 }
 function questMark(id) {
   if (!S.fl.pro) return id === 'chief';
+  if (id === 'chief' && !told()) return true; // 다음에 갈 곳을 들어야 해요
   const q = stage(), Q = QUESTS[q]; if (!Q) return false;
   if (Q.id === 'boss') return id === 'chief' && !S.fl.linked;
   if (Q.at === id && (Q.kill ? allDone() && isLeader() : !myDone() || (allDone() && isLeader() && Q.ask))) return true;
