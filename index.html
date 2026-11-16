@@ -30,7 +30,15 @@
   .chan { background: #33416f; color: #fff; font-size: 18px; padding: 10px 14px; border-radius: 12px; border: 2px solid #5b6ea8; }
   .chan.sel { background: #5aa2ff; border-color: #fff; color: #10203e; }
   #cont { display: block; margin: 12px auto 0; background: #3a9d5d; color: #fff; font-size: 18px; padding: 10px 18px; border-radius: 12px; border: 3px solid #1f5a34; }
-  #tlink { position: fixed; right: 12px; bottom: 10px; color: #8fa0c8; font-size: 14px; }
+  #topLinks { position: fixed; right: 14px; top: 12px; display: flex; gap: 8px; z-index: 3; }
+  #topLinks button, #topLinks a { font-family: inherit; font-size: 17px; padding: 9px 14px; border-radius: 12px; border: 2px solid #5b6ea8; background: rgba(16,20,40,.85); color: #fff; text-decoration: none; cursor: pointer; }
+  #topLinks a { background: linear-gradient(180deg, #ffbf47, #ff8a1f); color: #3a1d00; border-color: #7a3a00; }
+  dialog.qrbox { border: 0; border-radius: 22px; padding: 22px 26px 18px; background: #fbf7ec; color: #2a1c24; text-align: center; max-width: 94vw; font-family: inherit; }
+  dialog.qrbox::backdrop { background: rgba(8,10,24,.7); }
+  dialog.qrbox h2 { margin: 0 0 4px; font-size: 32px; color: #2c3a66; } dialog.qrbox .room { font-size: 26px; color: #c8324a; margin: 0 0 10px; }
+  dialog.qrbox #qrSvg svg { display: block; width: min(64vh, 80vw, 520px); height: auto; margin: 0 auto; background: #fff; shape-rendering: crispEdges; }
+  dialog.qrbox .url { font-size: 18px; margin: 10px 0 14px; word-break: break-all; color: #5a4a4a; }
+  #tQr { background: #ffd23f; color: #2a1c24; border: 0; border-radius: 10px; font-family: inherit; font-size: 17px; padding: 8px 14px; margin-left: 8px; cursor: pointer; }
 
   #qn { color: var(--gold); font-size: 18px; } #qq { font-size: 28px; margin: 14px 0 18px; line-height: 1.4; }
   .bar { height: 10px; background: #0e1430; border-radius: 6px; overflow: hidden; } #qbar { height: 100%; width: 0; background: linear-gradient(90deg, #5aa2ff, #9fe6ff); transition: width .3s; }
@@ -168,7 +176,8 @@
   <p id="roomMsg" class="tip">방 번호는 선생님이 게임을 열면 칠판에 알려 줘요.</p>
   <button id="newgame" class="go">새로 시작 (입장 문제)</button>
   <button id="cont" class="hide"></button>
-</div><a id="tlink" href="?teacher=1">선생님</a></div>
+</div><div id="topLinks"><button id="qrB" type="button">QR 코드</button><a id="tlink" href="?teacher=1">선생님 · 방 만들기</a></div></div>
+<dialog id="qrBox" class="qrbox" onclick="if (event.target === this) this.close()"><h2>몸속 원정대 · 디벗으로 열기</h2><p class="room" id="qrRoom"></p><div id="qrSvg"></div><p class="url" id="qrUrl"></p><form method="dialog"><button class="go">닫기</button></form></dialog>
 
 <div id="quiz" class="screen hide"><div class="win">
   <div id="qn"></div><div class="bar"><div id="qbar"></div></div><div id="qq"></div><div id="qa"></div>
@@ -204,15 +213,16 @@
   <h2 style="margin:0">몸속 원정대 · 선생님</h2>
   <div id="tLock" style="margin:14px 0"><input id="tPin" type="password" autocomplete="off" placeholder="선생님 암호" style="width:220px"> <button id="tGo" class="go">확인</button><p class="tip">한글 자판이 안 바뀌면 영문 자판 그대로 쳐도 돼요.</p></div>
   <div id="tOpen" class="hide" style="margin:14px 0"><p class="sub">게임을 열면 방 번호가 생겨요. 학생들은 그 번호를 써서 들어와요.</p><div id="tOpenBtns"><button id="tNew" class="go">새 방 열기</button><button id="tAgain" class="hide"></button></div><p id="tOpenMsg" class="tip"></p></div>
-  <div id="tMain" class="hide"><div id="tRoomBar"><span>방 번호</span><b id="tCode"></b><em id="tRoomState"></em><button id="tClose"></button></div><p id="tState" class="tip"></p><div id="tTabs" class="tb"></div><p id="tSummary" class="sum"></p><p class="tip">파티(혼자 포함)는 미션마다 답을 한 번 내고 바로 다음으로 가요. 노란 답에 [정답]/[오답]을 매겨 주세요. 다섯 미션을 마치고 답 확인이 끝난 파티는 보스 소굴에 들어갈 수 있고, 오답인 기관계가 보스전에서 말썽을 부려 져요. 진 뒤에만 그 답을 다시 낼 수 있어요. 파티원이 한 명이라도 쓰러지면 파티 모두 마을로 돌아가요.</p><div id="tChans"></div></div>
+  <div id="tMain" class="hide"><div id="tRoomBar"><span>방 번호</span><b id="tCode"></b><em id="tRoomState"></em><button id="tClose"></button><button id="tQr" type="button">QR 크게 보기</button></div><p id="tState" class="tip"></p><div id="tTabs" class="tb"></div><p id="tSummary" class="sum"></p><p class="tip">파티(혼자 포함)는 미션마다 답을 한 번 내고 바로 다음으로 가요. 노란 답에 [정답]/[오답]을 매겨 주세요. 다섯 미션을 마치고 답 확인이 끝난 파티는 보스 소굴에 들어갈 수 있고, 오답인 기관계가 보스전에서 말썽을 부려 져요. 진 뒤에만 그 답을 다시 낼 수 있어요. 파티원이 한 명이라도 쓰러지면 파티 모두 마을로 돌아가요.</p><div id="tChans"></div></div>
 </div></div>
 <div id="closed" class="screen hide"><div class="win"><h1 style="font-size:36px">게임이 닫혔어요</h1><p class="sub">선생님이 방을 닫았어요. 레벨과 직업은 이 디벗에 그대로 남아요.</p><button id="bBack" class="go">처음 화면으로</button></div></div>
 <div id="none" class="screen hide"></div>
 
-<script src="config.js?v=20261116k"></script>
-<script src="data.js?v=20261116k"></script>
-<script src="art.js?v=20261116k"></script>
-<script src="net.js?v=20261116k"></script>
-<script src="game.js?v=20261116k"></script>
+<script src="vendor/qrcode.min.js?v=1.4.4"></script>
+<script src="config.js?v=20261116l"></script>
+<script src="data.js?v=20261116l"></script>
+<script src="art.js?v=20261116l"></script>
+<script src="net.js?v=20261116l"></script>
+<script src="game.js?v=20261116l"></script>
 </body>
 </html>

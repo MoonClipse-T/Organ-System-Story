@@ -237,3 +237,10 @@
   model: "bytedance-seedream-5.5"
   date: 2026-11-16
   ships: true
+- path: vendor/qrcode.min.js
+  origin: licensed
+  tool: "curl from cdnjs"
+  source: {vendor: "Kazuhiko Arase", product: "qrcode-generator 1.4.4", url: "https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"}
+  licence: {id: MIT}
+  date: 2026-11-16
+  ships: true

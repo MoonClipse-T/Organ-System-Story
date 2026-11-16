@@ -173,7 +173,9 @@ function startLogin() {
   document.querySelectorAll('.chan').forEach(b => b.onclick = () => { ch = +b.dataset.ch; mark(); }); mark();
   const R = $('#room'), msg = $('#roomMsg'), solo = !!params.get('offline');
   $('#roomRow').classList.toggle('hide', solo); msg.classList.toggle('hide', solo);
-  R.value = sget('bq:room') || ''; R.oninput = () => { R.value = R.value.replace(/\D/g, '').slice(0, 4); };
+  R.value = (params.get('room') || '').replace(/\D/g, '').slice(0, 4) || sget('bq:room') || ''; // a scanned QR carries the room
+  R.oninput = () => { R.value = R.value.replace(/\D/g, '').slice(0, 4); };
+  $('#qrB').onclick = () => showQR(/^\d{4}$/.test(R.value) ? R.value : '');
   const say = (t, bad) => { msg.textContent = t; msg.classList.toggle('bad', !!bad); };
   let busy = false;
   const enter = async then => { // the teacher must have opened this room
@@ -1398,7 +1400,17 @@ async function openRoom() { // the teacher opens the game: a room number the stu
     on = !on; r.n.set('open', { on: on ? 1 : 0, t: r.n.now() }); bar();
   };
   setInterval(() => { if (on) r.n.set('open', { on: 1, t: r.n.now() }); }, 30 * 60e3); // keep it fresh through a long class
-  bar(); return r;
+  $('#tQr').onclick = () => showQR(r.code);
+  bar(); showQR(r.code); return r; // the room's QR goes up on the board right away
+}
+/** the game's own QR, big enough for the board; with a room, scanning it fills the room number in */
+function showQR(room) {
+  const url = location.origin + location.pathname + (room ? `?room=${room}` : '');
+  try { const q = qrcode(0, 'M'); q.addData(url); q.make(); $('#qrSvg').innerHTML = q.createSvgTag(8, 2); }
+  catch (e) { $('#qrSvg').textContent = 'QR 코드를 만들지 못했어요. 아래 주소를 칠판에 적어 주세요.'; }
+  $('#qrRoom').textContent = room ? `방 번호 ${room} · 찍으면 방 번호가 저절로 들어가요` : '선생님이 방을 열면 방 번호도 함께 써요';
+  $('#qrUrl').textContent = url.replace(/^https?:\/\//, '');
+  $('#qrBox').showModal();
 }
 
 // ---- Loop -------------------------------------------------------------------------------------------------------------------
