@@ -97,7 +97,9 @@ const job = () => JOBS[S.job];
 const maxHp = () => Math.round(tune.hp_base + S.lv * tune.hp_per_lv + job().hpBonus);
 const maxMp = () => Math.round(job().mpBase + S.lv * 6);
 const knows = k => S.lv >= SKILL_LV[k]; // move (Lv.5) · power (Lv.10)
-const atkPower = () => Math.round(tune.dmg_base + (S.quiz || 0) * tune.dmg_per_answer); // only the entry quiz; levels never add
+const atkPower = () => Math.round(tune.dmg_base + S.lv * tune.dmg_per_lv); // 공격: grows with the level
+const defense = () => Math.floor(S.lv * tune.def_per_lv);                 // 방어: taken off every hit (never below 1)
+const statLine = () => `공격 ${atkPower()} · 방어 ${defense()} · HP ${maxHp()} · MP ${maxMp()}`;
 const expNeed = () => tune.exp_per_lv * S.lv;
 const has = (id, n = 1) => (S.inv[id] || 0) >= n;
 function give(id, n = 1) { S.inv[id] = (S.inv[id] || 0) + n; }
@@ -107,7 +109,8 @@ function take(id, n = 1) { S.inv[id] = Math.max(0, (S.inv[id] || 0) - n); if (!S
 const G = {
   scene: 'login', t: 0, mapId: 'town', mapKey: 'town', map: null, me: null, cam: { x: 0, y: 0 }, mons: [], others: {}, drops: [], fx: [], nums: [], shots: [], fade: 0,
   host: false, net: null, ch: 0, id: '', unsub: [], killSeen: -1, hitSeq: 0, hitLog: [], hitSeen: {}, killLog: [], snapAt: 0, nextSend: 0, sentAt: 0, nextHost: 0, spawnAt: 0,
-  P: null, pOff: null, banner: null, dlg: null, dead: false, sporeHit: {}, partyInv: null, trial: null, toxin: 0, toxinT: 0, modal: false,
+  P: null, pOff: null, banner: null, dlg: null, dead: false, partyInv: null, trial: null, toxin: 0, toxinT: 0, modal: false,
+  carry: { g: 0, o: 0, e: 0, w: 0 }, o2: [], bA: null, batkHit: -1, gasT: 0, // 발전소에서 든 것 · 보스 공격
 };
 const stage = () => (G.P ? Math.min(QUESTS.length - 1, G.P.st || 1) : S.fl.pro ? 1 : 0); // the party's quest step (QUESTS index)
 const isLeader = () => !G.P || G.P.L === G.id;
@@ -151,7 +154,7 @@ function enterMap(id, x, y) {
   const map = MAPS[id];
   G.mapId = id; G.map = map; G.mapKey = map.inst ? `${id}_${S.pid || G.id}` : id;
   G.statics = platsOf(map); G.mons = []; G.drops = []; G.shots = []; G.nums = []; G.killSeen = G.net ? -1 : 0; G.killLog = []; G.snapAt = 0; G.host = false; G.spawnAt = 0;
-  G.toxin = 0; G.toxinT = 0; G.sporeHit = {};
+  G.toxin = 0; G.toxinT = 0; G.carry = { g: 0, o: 0, e: 0, w: 0 }; G.o2 = []; G.bA = null; G.batkHit = -1; G.gasT = 0;
   if (x === 'start') x = map.portals[0].x + 60;
   const py = y ?? spawnY(x);
   if (!G.me) G.me = newMe(x, py); else Object.assign(G.me, { x, y: py, vx: 0, vy: 0, ground: null, rope: null, cp: -1 });
@@ -219,7 +222,8 @@ function startQuiz() {
     const Q = LIST[i];
     $('#qn').textContent = `입장 문제 ${i + 1} / ${LIST.length}`; $('#qq').textContent = Q.q;
     $('#qbar').style.width = `${(i / LIST.length) * 100}%`;
-    $('#qa').innerHTML = Q.a.map((a, k) => `<button data-k="${k}"><b>${k + 1}</b> ${esc(a)}</button>`).join('');
+    $('#qa').innerHTML = Q.a.map((a, k) => `<button data-k="${k}"><b>${k + 1}</b> ${esc(a)}</button>`).join('')
+      + `<p class="tip">${i ? `지금 시작 레벨 Lv.${Math.max(1, tune.start_lv - (i - right))}` : `다 맞히면 Lv.${tune.start_lv}에서 시작해요 · 하나 틀릴 때마다 레벨 −1`}</p>`;
     $('#qa').querySelectorAll('button').forEach(b => b.onclick = () => {
       const k = +b.dataset.k; if ($('#qa').dataset.lock) return; $('#qa').dataset.lock = 1;
       const ok = k === Q.c; if (ok) { right++; SFX.pick(); } else SFX.hurt();
@@ -228,8 +232,8 @@ function startQuiz() {
     });
   };
   const done = () => {
-    S.quiz = right;
-    $('#qq').innerHTML = `${LIST.length}문제 중 <b>${right}</b>개 정답!<br>공격력 <b>${atkPower()}</b> <small>(정답이 많을수록 세요 · 이 공격력은 끝까지 그대로예요)</small>`;
+    S.quiz = right; S.lv = Math.max(1, tune.start_lv - (LIST.length - right)); S.exp = 0; // all right: Lv.8, one less for every wrong one
+    $('#qq').innerHTML = `${LIST.length}문제 중 <b>${right}</b>개 정답!<br>시작 레벨 <b>Lv.${S.lv}</b> <small>(다 맞히면 Lv.${tune.start_lv}, 하나 틀릴 때마다 −1)</small><br><small>공격 ${atkPower()} · 방어 ${defense()} · 사냥하면 레벨이 오르고, 레벨이 오를 때마다 능력치도 올라요. 세균 소굴은 Lv.${tune.boss_lv}부터!</small>`;
     $('#qbar').style.width = '100%'; $('#qn').textContent = '입장 문제 끝';
     $('#qa').innerHTML = '<button class="go">직업 고르러 가기</button>'; $('#qa .go').onclick = startJob;
     events.push({ type: 'quiz', right });
@@ -261,7 +265,7 @@ function jobPanel() { // what this job learns as it levels up; no stats to share
   const P = $('#stats'), J = job(); P.classList.remove('hide');
   P.innerHTML = `<h3 style="color:${J.color}">${J.name}</h3><div class="sk"><b>공격 · 스킬</b><span>${J.skill.name} (MP ${J.skill.mp})</span></div>`
     + `<div class="sk"><b>Lv.5</b><span>${J.move.name} — ${J.move.text}</span></div><div class="sk"><b>Lv.10</b><span>${J.power.name} — ${J.power.text}</span></div>`
-    + `<p class="tip">공격력은 입장 문제로 정해졌어요 (<b>${atkPower()}</b>). 레벨이 올라도 공격력은 그대로이고, HP · MP가 늘고 Lv.5와 Lv.10에 새 스킬을 배워요.</p><button id="startB" class="go">모험 시작!</button>`;
+    + `<div class="sk"><b>Lv.${S.lv}</b><span>${statLine()}</span></div><p class="tip">입장 문제로 <b>Lv.${S.lv}</b>에서 시작해요. 레벨이 하나 오를 때마다 공격 +${tune.dmg_per_lv} · HP +${tune.hp_per_lv} · MP +6, 방어도 조금씩 올라요. 미션을 깨거나 사냥하면 경험치를 얻어요. 세균 소굴은 <b>Lv.${tune.boss_lv}</b>부터!</p><button id="startB" class="go">모험 시작!</button>`;
   $('#startB').onclick = () => go(Number(sget('bq:ch')) || 1);
 }
 
@@ -286,7 +290,7 @@ async function go(ch) {
     G.net.on('cmd/' + G.id, onCmd);
   }
   G.me = null;
-  const m = S.map && MAPS[S.map] && !MAPS[S.map].inst ? S.map : 'town';
+  const m = S.map && MAPS[S.map] && (!MAPS[S.map].inst || TRY) ? S.map : 'town'; // ?try=lair may start in the lair
   enterMap(m, S.map ? S.x : 300, S.map ? S.y : undefined);
   G.me.hp = maxHp(); G.me.mp = maxMp();
   if (S.pid) watchParty(S.pid); else if (!G.net && S.fl.left) makeParty(true);
@@ -451,16 +455,16 @@ function onKills(k) {
   G.killSeen = Math.max(G.killSeen, k.s);
 }
 // 파티 사냥: one count for the whole party; each member writes only their own kills (cnt/<step>/<me>), the screen adds them up
-const killNeed = k => QUESTS[stage()].kill[k] * memberIds().length;
+const killNeed = k => (GOALS[k] && GOALS[k].once ? 1 : QUESTS[stage()].kill[k] * memberIds().length);
 function killTotal(k) { const c = (G.P && G.P.cnt && G.P.cnt[stage()]) || {}; return Object.values(c).reduce((s, m) => s + ((m && m[k]) || 0), 0); }
 function countKill(kind) {
-  const q = stage(), Q = QUESTS[q]; if (!Q || !Q.kill || !Q.kill[kind] || killTotal(kind) >= killNeed(kind)) return;
+  const q = stage(), Q = QUESTS[q]; if (!Q || !Q.kill || !Q.kill[kind] || killTotal(kind) >= killNeed(kind)) return false;
   const mine = { ...((G.P && G.P.cnt && G.P.cnt[q] && G.P.cnt[q][G.id]) || {}) }; mine[kind] = (mine[kind] || 0) + 1;
   if (G.net && S.pid) G.net.set(`pty/${S.pid}/cnt/${q}/${G.id}`, mine);
   if (G.P) { G.P.cnt = G.P.cnt || {}; (G.P.cnt[q] = G.P.cnt[q] || {})[G.id] = mine; }
-  G.nums.push({ x: G.me.x, y: G.me.y - 120, v: `${MONS[kind].name} ${killTotal(kind)}/${killNeed(kind)}`, t: 0, item: true });
-  if (killsDone()) { SFX.quest(); toast(`사냥 목표 달성! ${NPCS[Q.at].name}에게 가요.`); }
-  hud(); refreshParty();
+  G.nums.push({ x: G.me.x, y: G.me.y - 120, v: `${goalName(kind)} ${killTotal(kind)}/${killNeed(kind)}`, t: 0, item: true });
+  if (killsDone()) { SFX.quest(); toast(`목표 달성! ${NPCS[Q.at].name}에게 가요.`); }
+  hud(); refreshParty(); return true;
 }
 const killsDone = () => { const Q = QUESTS[stage()]; return !Q.kill || Object.keys(Q.kill).every(k => killTotal(k) >= killNeed(k)); };
 function gainExp(n) {
@@ -469,8 +473,9 @@ function gainExp(n) {
     S.exp -= expNeed(); S.lv++; G.me.hp = maxHp(); G.me.mp = maxMp();
     G.fx.push({ k: 'lv', x: G.me.x, y: G.me.y, t: 0 }); SFX.lvup();
     const learn = S.lv === SKILL_LV.move ? job().move : S.lv === SKILL_LV.power ? job().power : null;
-    G.banner = learn ? { big: `Lv.${S.lv} · 새 스킬 「${learn.name}」!`, small: learn.text, t: 5 } : { big: `레벨 업! Lv.${S.lv}`, small: `HP · MP가 늘었어요${S.lv < SKILL_LV.power ? ` · 다음 스킬은 Lv.${S.lv < SKILL_LV.move ? SKILL_LV.move : SKILL_LV.power}` : ''}`, t: 2 };
-    if (learn) toast(`${S.lv === SKILL_LV.move ? 'Shift' : 'V'} 키 또는 오른쪽 아래 「${learn.name}」 버튼`);
+    G.banner = learn ? { big: `Lv.${S.lv} · 새 스킬 「${learn.name}」!`, small: `${learn.text} · ${statLine()}`, t: 5 } : { big: `레벨 업! Lv.${S.lv}`, small: statLine(), t: 2.5 };
+    if (learn) toast(`${S.lv === SKILL_LV.move ? 'Shift' : 'V'} 키 또는 오른쪽 아래 「${learn.name}」 버튼${S.lv === tune.boss_lv ? ` · 이제 세균 소굴에 들어갈 수 있어요` : ''}`);
+    else if (S.lv === tune.boss_lv) toast(`Lv.${tune.boss_lv}! 이제 세균 소굴에 들어갈 수 있어요.`);
   }
   save(); hud();
 }
@@ -478,14 +483,81 @@ function gainExp(n) {
 // ---- Boss lair: one per party, opened by the teacher ----------------------------------------------------
 const bossMissing = () => (G.mapId === 'lair' ? BOSS_RULES.filter(r => wrongQs().includes(r.q)) : []); // 오답 = that system fails
 function bossNow() { return G.mons.find(m => m.k === 'boss' && !m.dead); }
-const SPORE = { every: 5, warn: 1.1, fall: 0.6, n: 9, spread: 1000 };
-function spores() { // where the boss's spores land this cycle (same on every tablet)
-  const b = bossNow(); if (!b || !b.bt) return [];
-  const age = netT() - b.bt / 1000; if (age < 3) return [];
-  const n = Math.floor(age / SPORE.every), ph = age - n * SPORE.every;
-  if (ph > SPORE.warn + SPORE.fall + 0.25) return [];
-  return Array.from({ length: SPORE.n }, (_, i) => ({ id: n * 100 + i, x: b.x + (hash2(b.bt % 9973 + n, i) - 0.5) * SPORE.spread, gy: G.map.ground, ph }));
+// 보스 공격: every batk_every seconds one of four, picked the same way on every tablet. The red areas (z) blink for
+// batk_warn seconds, then the attack lands there: hit = how long it hurts, act = how long it is drawn.
+const BATK = ['spore', 'sweep', 'pillar', 'gas'];
+const BATK_TIP = { spore: '포자 비! 빨간 곳 밖으로', sweep: '촉수 휘두르기! 점프하거나 발판 위로', pillar: '촉수 기둥! 빨간 기둥에서 나와요', gas: '독가스! 보스에게서 멀리 떨어져요' };
+function bossAtk() {
+  const b = bossNow(); if (!b || !b.bt || G.mapId !== 'lair') return null;
+  const age = netT() - b.bt / 1000 - 3; if (age < 0) return null; // 3 s to get ready
+  const n = Math.floor(age / tune.batk_every), ph = age - n * tune.batk_every;
+  if (!G.bA || G.bA.n !== n || G.bA.bt !== b.bt) G.bA = makeAtk(b, n); // the place is fixed when the attack starts
+  const A = G.bA; if (ph > A.warn + A.act) return null;
+  return Object.assign(A, { ph, on: ph >= A.warn });
 }
+function makeAtk(b, n) {
+  const h = i => hash2((b.bt % 9973) + n * 7.13, i), gy = G.map.ground, W2 = G.map.w, warn = tune.batk_warn;
+  // all four kinds in every four attacks, in turn from a starting point that changes
+  const kind = BATK[(n + Math.floor(hash2(b.bt % 9973, Math.floor(n / 4)) * 4)) % 4], Z = (x0, x1, y0, y1) => ({ x0: Math.max(0, x0), x1: Math.min(W2, x1), y0, y1 });
+  if (kind === 'spore') return { n, bt: b.bt, kind, warn, hit: 0.7, act: 0.8, dmg: MONS.boss.dmg, z: Array.from({ length: 9 }, (_, i) => { const x = b.x + (h(i + 1) - 0.5) * 1200; return Z(x - 40, x + 40, gy - 70, gy); }) };
+  if (kind === 'sweep') { const d = h(1) < 0.5 ? -1 : 1, x = b.x + d * 60; return { n, bt: b.bt, kind, warn, hit: 0.45, act: 0.7, dmg: tune.sweep_dmg, dir: d, z: [d > 0 ? Z(x, x + 1000, gy - 66, gy) : Z(x - 1000, x, gy - 66, gy)] }; }
+  if (kind === 'pillar') return { n, bt: b.bt, kind, warn, hit: 0.6, act: 0.8, dmg: tune.pillar_dmg, z: Array.from({ length: 5 }, (_, i) => { const x = b.x + (i - 2) * 300 + (h(i + 1) - 0.5) * 160; return Z(x - 55, x + 55, gy - 430, gy); }) };
+  return { n, bt: b.bt, kind: 'gas', warn, hit: 2.4, act: 2.4, dmg: tune.gas_dmg, z: [Z(b.x - 380, b.x + 380, gy - 300, gy)] };
+}
+const inZone = (m, z) => m.x + 14 > z.x0 && m.x - 14 < z.x1 && m.y > z.y0 && m.y - (m.prone ? 22 : 52) < z.y1;
+
+// ---- 잠입 (콩팥 정수장): ghosts on the shared clock; a touch or a fall sends you back to the start of the zone ----------
+function ghostAt(g, t) {
+  const a = (t / g[4] + g[5]) * Math.PI * 2, s = 0.5 - 0.5 * Math.cos(a);
+  return g[0] === 'h' ? { x: g[1] + (g[2] - g[1]) * s, y: g[3], f: Math.sin(a) >= 0 ? 1 : -1 } : { x: g[1], y: g[2] + (g[3] - g[2]) * s, f: Math.sin(t) >= 0 ? 1 : -1 };
+}
+function sneak(m) {
+  const map = G.map, t = netT();
+  for (let i = map.cps.length - 1; i > 0; i--) if (m.x > map.cps[i] + 20 && m.cp < i) { m.cp = i; toast(`${map.cpName[i]} · 들키면 여기서부터 다시 해요`); SFX.pick(); break; }
+  if (m.x >= map.goal && countKill('reach')) { G.banner = { big: '잠입 성공!', small: '한 번도 들키지 않고 네프론 정수기에 닿았어요. 말을 걸어요!', t: 4 }; }
+  if (m.inv > 0) return;
+  const top = m.y - (m.prone ? 22 : 52);
+  for (const g of map.ghosts) { const p = ghostAt(g, t); if (Math.abs(p.x - m.x) < 38 && m.y > p.y - 66 && top < p.y - 6) { caught('ghost'); return; } }
+}
+function caught(why) {
+  const m = G.me, map = G.map, i = Math.max(0, m.cp), x = i ? map.cps[i] + 40 : map.portals[0].x + 60;
+  Object.assign(m, { x, y: groundBelow(x, -9999), vx: 0, vy: 0, ground: null, rope: null, inv: 1.2, push: 0, hurt: 0 });
+  SFX.hurt(); G.fade = 0.7; G.caught = (G.caught || 0) + 1;
+  G.banner = { big: why === 'fall' ? '여과액에 빠졌어요!' : '들켰다!', small: `${map.cpName[i]} 처음부터 다시 · 유령의 움직임을 보고 몰래!`, t: 2.5, boss: true };
+  events.push({ type: 'caught', why, cp: i });
+}
+
+// ---- 세포 호흡 발전소: 포도당 + 산소 → 발전기 → 에너지 (쓰이는 곳으로) + 물 · 이산화 탄소 (혈관 출구로) -------------------
+// What I carry lives on this tablet only (G.carry); what the party has powered is the shared count (cnt/<step>).
+function plant(m) {
+  const P = G.map.plant, c = G.carry, gy = G.map.ground, near = (x, y, r) => Math.abs(m.x - x) < r && Math.abs(m.y - y) < 60;
+  const say = s => { if (G.t - (G.pSay || 0) > 3.5) { G.pSay = G.t; toast(s); } }, pop = s => G.nums.push({ x: m.x, y: m.y - 120, v: s, t: 0, item: true });
+  if (near(P.glucose, gy, 50)) {
+    if (c.w) say('물과 이산화 탄소를 먼저 오른쪽 끝 혈관 출구로 내보내요!');
+    else if (c.e) say('들고 있는 에너지를 먼저 쓰이는 곳으로 옮겨요!');
+    else if (!c.g) { c.g = 1; SFX.pick(); pop('포도당 +1'); hud(); }
+  }
+  P.oxygen.forEach(([x, y], i) => {
+    if (!near(x, y, 40) || G.t < (G.o2[i] || 0) || c.o) return;
+    if (c.w || c.e) { say('에너지와 노폐물을 먼저 옮기고 와요!'); return; }
+    c.o = 1; G.o2[i] = G.t + 2.5; SFX.pick(); pop('산소 +1'); hud();
+  });
+  if (near(P.engine, gy, 100)) {
+    if (c.g && c.o) {
+      c.g = c.o = 0; c.e = 1; c.w = 1; G.burn = G.t; SFX.quest(); hud();
+      G.nums.push({ x: P.engine, y: gy - 250, v: '포도당 + 산소 → 에너지 + 물 + 이산화 탄소', t: 0, item: true });
+      say('에너지가 나왔어요! 쓰이는 곳으로 옮기고, 물 · 이산화 탄소는 오른쪽 끝 혈관 출구로!');
+    } else if (!c.e) say(c.g ? '산소가 필요해요! 발판 위 산소 방울을 모아 와요.' : c.o ? '포도당이 필요해요! 왼쪽 관에서 받아 와요.' : '포도당(왼쪽 관)과 산소(발판 위)를 가져와요.');
+  }
+  if (c.e) for (const [k, x, y, name] of P.uses) {
+    if (!near(x, y, 54)) continue;
+    if (countKill(k)) { c.e = 0; G.used = { x, y, t: G.t }; pop(`${name}에 에너지!`); hud(); }
+    else say(Q4() ? `${goalName(k)}에는 이제 충분해요! 다른 곳에 써요.` : '지금은 발전소 미션 때가 아니에요.');
+    break;
+  }
+  if (c.w && near(P.exit, gy, 70)) { c.w = 0; SFX.pick(); pop('물 · 이산화 탄소 → 혈관'); toast('물과 이산화 탄소는 혈관(순환계)을 타고 나가요. 이산화 탄소는 폐로, 물은 콩팥 · 폐로!'); hud(); }
+}
+const Q4 = () => QUESTS[stage()] && QUESTS[stage()].id === 'cell';
 function bossWin() {
   if (G.mapId !== 'lair') return;
   gainExp(MONS.boss.exp); S.fl.boss = (S.fl.boss || 0) + 1; save(); SFX.quest();
@@ -498,7 +570,7 @@ function bossLose(miss, write) { // we fell in the lair: show which answers were
   const lead = isLeader();
   box.innerHTML = `<div class="cin" style="--c:#c8324a"><small>세균 대왕에게 졌어요</small><h2>${miss.length ? '말썽을 부린 기관계' : '아쉽게 졌어요'}</h2>`
     + (miss.length ? `<p>선생님이 <b>오답</b>으로 확인한 기관계가 제 일을 못 했어요. 무엇이 틀렸는지 보고 ${lead ? '다시 써서' : '파티장이 다시 써서'} 내면, 정답일 때 이 말썽이 사라져요.</p><ul class="miss">${miss.map(r => { const s = subOf(r.q), g = grOf(r.q); return `<li style="--c:${SYS[r.sys].color}"><b>${SYS[r.sys].name} · ${r.name}</b> ${r.text}${s ? `<br><small>우리 답: “${esc(s.a)}”${g && g.c ? ` · 선생님: ${esc(g.c)}` : ''}</small>` : ''}${lead ? `<br><button class="go small" data-rw="${r.q}">이 답 다시 쓰기</button>` : ''}</li>`; }).join('')}</ul>`
-      : '<p>모든 기관계가 제 일을 했어요. 포자를 피하고, 아무도 쓰러지지 않게 서로 도우며 다시 도전해요!</p>')
+      : '<p>모든 기관계가 제 일을 했어요. 빨갛게 깜빡이는 곳을 피하고, 아무도 쓰러지지 않게 서로 도우며 다시 도전해요!</p>')
     + '<button class="go" id="blX">마을로</button></div>';
   const close = () => { box.classList.add('hide'); G.modal = false; hud(); };
   $('#blX').onclick = close;
@@ -534,6 +606,7 @@ function onParty(pid, P) {
 function stepUp(from, to) { // a mission is done: back to town, cards for every step cleared, then the chief says where next
   S.fl.seen = to - 1; delete S.fl.loaded; delete S.fl.exhaled; delete S.fl.urine;
   if (G.mapId !== 'town') { enterMap('town', 640); G.me.hp = Math.max(G.me.hp, Math.round(maxHp() * 0.6)); }
+  if (to > from) gainExp(tune.mission_exp * (to - from)); // 미션 보상: every member
   const cards = QUESTS.slice(from, to).filter(Q => Q.sys).map(Q => Q.sys);
   SFX.quest(); G.fx.push({ k: 'lv', x: G.me.x, y: G.me.y, t: 0 });
   const next = () => {
@@ -757,19 +830,27 @@ function updateMe(dt) {
     const rp = m.rope; m.vx = 0; m.vy = 0;
     if (!frozen()) m.y += (D ? 1 : U ? -1 : 0) * tune.climb * slow * dt;
     m.st = 'climb';
-    if (m.y <= rp[1]) { m.y = rp[1]; m.rope = null; m.ground = G.statics.find(p => Math.abs(p.y - rp[1]) < 3 && rp[0] >= p.x && rp[0] <= p.x + p.w) || null; }
+    if (m.y <= rp[1]) { // the top: step off onto the ledge there, or just hang at the end of a rope that hangs from nothing
+      m.y = rp[1]; const top = G.statics.find(p => Math.abs(p.y - rp[1]) < 3 && rp[0] >= p.x && rp[0] <= p.x + p.w);
+      if (top) { m.rope = null; m.ground = top; }
+    }
     else if (m.y >= rp[2]) { m.y = rp[2]; m.rope = null; }
-    else if (isHit('jump') && (L || R)) { m.rope = null; m.vy = -tune.jump * 0.55; m.vx = (R ? 1 : -1) * tune.walk; m.f = R ? 1 : -1; }
+    else if (isHit('jump') && (L || R)) { m.rope = null; m.vy = -tune.jump * 0.55; m.vx = (R ? 1 : -1) * tune.walk; m.f = R ? 1 : -1; m.offRope = rp; m.offT = G.t; }
+    if (map.ghosts && !G.dead) sneak(m); // hanging still is how you let a ghost go by, so it is checked here too
     return;
   }
   if (!frozen() && (U || D)) {
     const rp = map.ropes.find(r => Math.abs(r[0] - m.x) < 18 && (U ? m.y > r[1] + 4 && m.y <= r[2] + 4 : Math.abs(m.y - r[1]) < 4));
     if (rp) { m.rope = rp; m.x = rp[0]; m.ground = null; if (D) m.y += 6; return; }
   }
+  if (map.autoRope && !frozen() && !m.ground && m.vy > 0) { // 잠입 맵: falling past a rope grabs it, so rope-to-rope needs only ◀▶ + 점프
+    const rp = map.ropes.find(r => Math.abs(r[0] - m.x) < 16 && m.y > r[1] + 4 && m.y < r[2] && !(r === m.offRope && G.t - m.offT < 0.5));
+    if (rp) { m.rope = rp; m.x = rp[0]; m.vx = 0; m.vy = 0; m.push = 0; SFX.pick(); return; }
+  }
   m.prone = !frozen() && D && !!m.ground && m.push <= 0 && m.hurt <= 0; // 엎드리기: ▼ on the ground, still turns with ◀ ▶
   if (m.hurt <= 0) {
     const want = frozen() || m.prone || m.atkT >= 0 && m.ground ? 0 : (R ? 1 : 0) - (L ? 1 : 0);
-    m.vx = want * tune.walk * slow; if (want) m.f = want;
+    m.vx = want * tune.walk * slow * (G.carry.w ? 0.75 : 1); if (want) m.f = want; // 물 · 이산화 탄소를 들면 무거워요
     if (m.prone && (L || R)) m.f = R ? 1 : -1;
   }
   if (m.push > 0) m.vx = m.pvx; // 대쉬 · 백대쉬 · 더블 점프: the skill moves me, not the stick
@@ -795,17 +876,23 @@ function updateMe(dt) {
   }
   m.x = Math.max(20, Math.min(map.w - 20, m.x));
   if (map.valves) valves(m);
-  if (map.hazard && m.y > map.hazard + 20) fallBack(true);
-  if (m.y > map.h + 300) fallBack(false);
+  if (map.hazard && m.y > map.hazard + 20) { if (map.ghosts) caught('fall'); else fallBack(true); }
+  if (m.y > map.h + 300) { if (map.ghosts) caught('fall'); else fallBack(false); }
   m.st = m.hurt > 0 ? 'hurt' : !m.ground ? 'jump' : m.prone && m.ground ? 'prone' : Math.abs(m.vx) > 1 ? 'walk' : 'stand';
   if (map.gim) hazards(m);
+  if (map.ghosts && !G.dead) sneak(m);
+  if (map.plant && !frozen()) plant(m);
+  const A = bossAtk(); // 독가스: every half second inside the cloud, armour or not
+  if (A && A.on && A.kind === 'gas' && !G.dead) { G.gasT += dt; if (G.gasT >= 0.5) { G.gasT = 0; if (A.z.some(z => inZone(m, z))) { m.hp -= tune.gas_dmg; G.nums.push({ x: m.x, y: m.y - 80, v: tune.gas_dmg, t: 0, ouch: true }); SFX.hurt(); if (m.hp <= 0) { m.hp = 0; die(); } } } }
   if (m.inv <= 0 && !G.dead && !(m.push > 0 && J.move.kind === 'dash')) { // touching monsters, clots, spores (not while dashing)
     for (const mo of G.mons) {
       if (mo.dead) continue; const M = MONS[mo.k];
       if (Math.abs(mo.x - m.x) < M.w / 2 + 8 && m.y > mo.y - M.h - 30 && m.y < mo.y + 20) { hurt(M.dmg, mo.x < m.x ? 1 : -1); break; }
     }
     if (map.clots) for (const c of map.clots) { const x = clotX(c); if (Math.abs(x - m.x) < (m.prone ? 40 : 28) && Math.abs(m.y - c[1]) < 40) { hurt(8, x < m.x ? 1 : -1); break; } }
-    for (const s of spores()) if (s.ph > SPORE.warn + SPORE.fall - 0.05 && !G.sporeHit[s.id] && Math.abs(s.x - m.x) < 36 && Math.abs(m.y - s.gy) < 50) { G.sporeHit[s.id] = 1; hurt(MONS.boss.dmg, s.x < m.x ? 1 : -1); break; }
+    if (A && A.on && A.kind !== 'gas' && G.batkHit !== A.n && A.ph < A.warn + A.hit) { // 촉수 · 포자: one hit per attack
+      const z = A.z.find(z => inZone(m, z)); if (z) { G.batkHit = A.n; hurt(A.dmg, (z.x0 + z.x1) / 2 < m.x ? 1 : -1); }
+    }
   }
   for (const d of G.drops) if (d.t > 0.4 && Math.abs(d.x - m.x) < 30 && Math.abs(d.y - m.y) < 50 && !d.got) { // drops I walk over
     d.got = true; give(d.id); SFX.pick(); G.nums.push({ x: d.x, y: d.y - 40, v: `${ITEMS[d.id].name} +1`, t: 0, item: true }); hud(); save();
@@ -843,6 +930,7 @@ function fallBack(blood) {
   Object.assign(m, { x, y: spawnY(x), vx: 0, vy: 0, ground: null, rope: null, inv: 1 });
 }
 function hurt(dmg, dir) {
+  dmg = Math.max(1, dmg - defense());
   const m = G.me; m.hp -= dmg; m.inv = tune.hurt_invuln; m.hurt = 0.3; m.push = 0; m.vx = dir * 260; m.vy = -330; m.ground = null; m.rope = null;
   G.nums.push({ x: m.x, y: m.y - 80, v: dmg, t: 0, ouch: true }); SFX.hurt();
   if (m.hp <= 0) { m.hp = 0; die(); }
@@ -925,6 +1013,7 @@ function tryPortal() {
   if (G.mapId === 'town' && !S.fl.pro) { toast('먼저 셀리 촌장에게 이야기를 들어요.'); return true; }
   if (p.for && !told()) { toast('먼저 셀리 촌장에게 다음에 갈 곳을 들어요.'); return true; }
   if (p.for && !p.for.includes(stage())) { toast(`지금은 이 포탈로 갈 수 없어요. 지금 할 일: ${QUESTS[stage()].go}`); return true; }
+  if (p.boss && S.lv < tune.boss_lv) { toast(`세균 소굴은 Lv.${tune.boss_lv}부터 들어갈 수 있어요 (지금 Lv.${S.lv}). 소화관 동굴에서 사냥해 레벨을 올려요!`); return true; }
   if (p.boss && ungraded().length) { toast(`선생님이 아직 확인하지 않은 답이 ${ungraded().length}개 있어요. 확인이 끝나면 들어갈 수 있어요!`); return true; }
   const goTo = id => { if (G.mapId === 'town') leaveTown(); SFX.portal(); enterMap(id, p.tx === 'start' ? 'start' : p.tx); afterPortal(id); };
   if (p.pick) pickLevel(p.to, goTo); else goTo(p.to);
@@ -944,6 +1033,8 @@ function afterPortal(id) {
   if (base === 'lung' && stage() === 2) toast('기관지 나무 꼭대기까지 점프로 올라가요! 떨어지면 아래 가지부터 다시.');
   if (base === 'vessel' && stage() === 3 && !S.fl.loaded) toast('먼저 하트 선장(심장)에게 말을 걸어 짐을 실어요.');
   else if (MAPS[id] && MAPS[id].pulse) toast('쿵! 심장이 뛸 때만 판막이 열리고, 혈액이 오른쪽으로 밀어 줘요. 박동에 맞춰 뛰어요!');
+  if (id === 'mito') G.banner = { big: '미토콘드리아 발전소', small: '포도당(왼쪽 관) + 산소(발판 위 방울) → 발전기 → 에너지를 쓰이는 곳으로!', t: 5 };
+  if (id === 'kidney') G.banner = { big: '콩팥 정수장 · 잠입', small: '요소 유령에게 한 번이라도 닿으면 그 구역 처음부터! 움직임을 보고 몰래 지나가요.', t: 5 };
   if (id === 'lair') { const miss = bossMissing(); G.banner = { big: '세균 대왕의 소굴', small: miss.length ? `어딘가 몸이 이상해요… (${miss.map(r => r.name).join(' · ')})` : '모든 기관계가 제 일을 해요. 파티와 함께 무찔러요!', t: 5, boss: true }; }
 }
 function npcNear() { return G.map.npcs.find(([, x, y]) => Math.abs(x - G.me.x) < 70 && Math.abs(y - G.me.y) < 60); }
@@ -967,7 +1058,7 @@ function talk(id) {
     return say([...guide, canFormParty() ? '파티는 마을에서만 만들 수 있어. 왼쪽 위 [파티 · 친구]를 눌러 친구를 초대해 봐 (최대 4명).' : '파티원 모두가 끝내야 다음으로 갈 수 있어. 서로 도와줘!'],
       () => { if (fresh) { S.fl.told = q; save(); hud(); SFX.pick(); toast('그 포탈이 열렸어요!'); } });
   }
-  if (atQuest && turnIn()) return;
+  if (atQuest && id !== 'mito' && id !== 'nephron' && turnIn()) return; // those two say their own lines
   if (id === 'villi') {
     if (!atQuest) return say(q < 1 ? ['영양소를 흡수하는 게 내 일이야.'] : ['맛있는 영양소, 잘 흡수했어! 고마워.']);
     if (!killsDone()) return say([...TALK.villi_wait, `지금 파티 사냥: ${Object.keys(Q.kill).map(k => `${MONS[k].name} ${killTotal(k)}/${killNeed(k)}`).join(' · ')}`]);
@@ -990,7 +1081,8 @@ function talk(id) {
   }
   if (id === 'mito') {
     if (!atQuest) return say(q < 4 ? ['발전소가 멈췄어… 영양소와 산소가 도착해야 세포 호흡을 할 수 있어.'] : ['에너지 펑펑! 고마워, 원정대!']);
-    return say(TALK.mito_done, () => markDone());
+    if (!killsDone()) return say(G.mapId === 'mito' ? [...TALK.mito_wait, `지금 파티: ${Object.keys(Q.kill).map(k => `${goalName(k)} ${killTotal(k)}/${killNeed(k)}`).join(' · ')}`] : TALK.mito_town);
+    return say(TALK.mito_done, () => { if (isLeader()) answerBox(); else toast('파티장이 답을 써서 내요.'); });
   }
   if (id === 'diaphragm') {
     if (q === 5 && !myDone()) return say(TALK.diaphragm_exhale, () => { S.fl.exhaled = 1; save(); toast('호흡계: 이산화 탄소를 날숨으로 내보냈어요!'); markDone(); });
@@ -998,8 +1090,8 @@ function talk(id) {
   }
   if (id === 'nephron') {
     if (!atQuest) return say(q < 5 ? ['아직 걸러낼 노폐물이 없어. 깨끗해!'] : ['콩팥은 하루에도 엄청 많은 혈액을 걸러.']);
-    if (!killsDone()) return say([...TALK.nephron_wait, `지금 파티 사냥: 요소 유령 ${killTotal('urea')}/${killNeed('urea')}`]);
-    if (!allDone()) return say(['요소는 다 걸렀어! 그런데 아직 이산화 탄소를 내쉬지 않은 파티원이 있어. 모두 기관지 나무 아래 가로막 아저씨에게!']);
+    if (!killsDone()) return say(TALK.nephron_wait);
+    if (!allDone()) return say(['여기까지 몰래 오다니! 요소는 내가 걸러 둘게. 그런데 아직 이산화 탄소를 내쉬지 않은 파티원이 있어. 모두 기관지 나무 아래 가로막 아저씨에게!']);
     return say(TALK.nephron_done, () => { if (isLeader()) answerBox(); else toast('파티장이 답을 써서 내요.'); });
   }
 }
@@ -1037,13 +1129,14 @@ function toast(s) { const t = $('#toast'); t.textContent = s; t.classList.add('o
 function hud() {
   if (!S || !G.me) return;
   const m = G.me, q = stage(), Q = QUESTS[q] || QUESTS[QUESTS.length - 1];
-  $('#hLv').textContent = `Lv.${S.lv}`; $('#hName').textContent = `${S.name} · ${job().name} · 공격 ${atkPower()}`;
+  $('#hLv').textContent = `Lv.${S.lv}`; $('#hName').textContent = `${S.name} · ${job().name} · 공격 ${atkPower()} · 방어 ${defense()}`;
   hudBars();
   $('#hExp').style.width = `${(S.exp / expNeed()) * 100}%`; $('#hExpT').textContent = `EXP ${S.exp} / ${expNeed()}`;
   let prog = '';
   if (!S.fl.pro) prog = '';
   else if (myDone() && !Q.kill) prog = `<span class="done">내 몫 완료</span>`;
-  if (S.fl.pro && Q.kill) prog = Object.keys(Q.kill).map(k => `<span class="${killTotal(k) >= killNeed(k) ? 'done' : ''}">${MONS[k].name} ${Math.min(killTotal(k), killNeed(k))}/${killNeed(k)}</span>`).join('') + (memberIds().length > 1 ? `<span class="wait">파티 ${memberIds().length}명 × ${memberIds().length}배</span>` : '');
+  if (S.fl.pro && Q.kill) prog = Object.keys(Q.kill).map(k => `<span class="${killTotal(k) >= killNeed(k) ? 'done' : ''}">${goalName(k)} ${Math.min(killTotal(k), killNeed(k))}/${killNeed(k)}</span>`).join('') + (memberIds().length > 1 && Object.keys(Q.kill).some(k => !(GOALS[k] && GOALS[k].once)) ? `<span class="wait">파티 ${memberIds().length}명 × ${memberIds().length}배</span>` : '');
+  if (G.map.plant) { const c = G.carry, h = [c.g && '포도당', c.o && '산소', c.e && '에너지', c.w && '물 · 이산화 탄소'].filter(Boolean); prog += `<span class="wait">든 것: ${h.length ? h.join(' · ') : '없음'}</span>`; }
   if (Q.id === 'waste') prog += `<span class="${myDone() ? 'done' : ''}">이산화 탄소 내쉬기</span>`;
   if (Q.id === 'vessel' && !myDone()) prog = `<span class="${S.fl.loaded ? 'done' : ''}">하트 선장에게 짐 싣기</span>`;
   let state = '';
@@ -1054,6 +1147,7 @@ function hud() {
   if (Q.id === 'boss' && S.fl.pro) { // the last mission: wait for the teacher, then the lair; after a loss, rewrite what was wrong
     const ug = ungraded(), rw = ASKQ.filter(canRewrite);
     state = ug.length ? `<span class="wait">선생님이 답을 확인하는 중 (${ug.length}개 남음)</span>` : '<span class="done">세균 소굴 포탈로!</span>';
+    if (S.lv < tune.boss_lv) state += `<span class="back">세균 소굴은 Lv.${tune.boss_lv}부터 · 지금 Lv.${S.lv} → 소화관 동굴에서 사냥!</span>`;
     if (rw.length) state += rw.map(k => isLeader() ? `<button class="go small" data-rw="${k}">다시 쓰기: ${SYS[QUESTS[k].sys].name}</button>` : `<span class="back">다시 써야 해요: ${SYS[QUESTS[k].sys].name}</span>`).join('');
   }
   if (S.fl.pro && !told() && !(Q.ask && allDone())) { prog = ''; state = '<span class="wait">셀리 촌장에게 가서 다음에 갈 곳 듣기</span>'; }
@@ -1105,6 +1199,9 @@ function drawPlay() {
     for (const o of map.gim.orbs) { const p = orbAt(o); drawOrb(ctx, p.x, p.y, t, map.theme); }
     for (const g of map.gim.geysers) { const s = geyserAt(g); if (s.warn) drawGeyser(ctx, g[0], g[1], 0, true, map.theme); else if (s.on) drawGeyser(ctx, g[0], g[1], s.h, false, map.theme); }
   }
+  if (map.plant) plantDraw(map, t);
+  if (map.ghosts) sneakDraw(map, t);
+  { const A = bossAtk(); if (A && !A.on) warnDraw(A, t); } // the red areas, under everyone
   for (const mo of G.mons) if (!mo.dead) drawMon(ctx, mo.k, mo.x, mo.y, mo.dir < 0 ? -1 : 1, t + mo.x * 0.01, mo.flash > 0, mo.hp / mo.mhp);
   for (const d of G.drops) drawItemIcon(ctx, d.id, d.x, d.y - 12 - Math.abs(Math.sin(t * 3)) * 4, 1.2);
   for (const [id, p] of Object.entries(G.others)) {
@@ -1118,11 +1215,9 @@ function drawPlay() {
   if (stage() >= 5) aura(m.x, m.y, t);
   if (!(m.inv > 0 && Math.floor(t * 12) % 2)) drawHero(ctx, m.x, m.y, m.f, S.job, S.look, { st: m.st, t, atk: m.atkT });
   tag(S.name, m.x, m.y + 16, '#b8862a');
+  if (G.map.plant) carried(m, t);
   for (const s of G.shots) if (s.t >= 0) shotDraw(s, t);
-  for (const sp of spores()) {
-    if (sp.ph < SPORE.warn) { ctx.save(); ctx.globalAlpha = 0.4 + 0.4 * Math.sin(t * 20); ctx.beginPath(); ctx.ellipse(sp.x, sp.gy, 34, 8, 0, 0, Math.PI * 2); ctx.fillStyle = '#ff3b3b'; ctx.fill(); ctx.restore(); }
-    else { const k = Math.min(1, (sp.ph - SPORE.warn) / SPORE.fall); ctx.save(); ctx.translate(sp.x, sp.gy - 560 * (1 - k)); ctx.rotate(t * 6); hexa(ctx, 0, -12, 14, '#7ccf5a'); ctx.restore(); }
-  }
+  const BA = bossAtk(); if (BA && BA.on) bossAtkDraw(BA, t);
   for (const f of G.fx) fxDraw(f);
   for (const n of G.nums) {
     const a = 1 - n.t / 1.1; ctx.globalAlpha = Math.max(0, a);
@@ -1157,6 +1252,112 @@ function debuffs(miss) { // the boss rules I suffer from, under the boss bar
     rr(ctx, x - 70, 58, 140, 28, 10); ctx.fillStyle = SYS[r.sys].color + 'ee'; ctx.fill(); stroke(ctx, 2);
     text(label, x, 72, 16, '#fff', 'center', OL);
   });
+}
+// ---- 보스 공격 그림: red warning first (it fills up as the hit comes), then the attack itself ------------------------------
+function warnDraw(A, t) {
+  const k = Math.min(1, A.ph / A.warn), c = ctx, b = bossNow();
+  for (const z of A.z) {
+    c.save(); c.globalAlpha = 0.2 + 0.14 * Math.sin(t * 22); c.fillStyle = '#ff2a2a'; c.fillRect(z.x0, z.y0, z.x1 - z.x0, z.y1 - z.y0);
+    c.globalAlpha = 0.42; c.fillRect(z.x0, z.y1 - (z.y1 - z.y0) * k, z.x1 - z.x0, (z.y1 - z.y0) * k); // fills up: when it is full, it hits
+    c.globalAlpha = 0.9; c.setLineDash([12, 8]); c.lineWidth = 3; c.strokeStyle = '#ff4040'; c.strokeRect(z.x0, z.y0, z.x1 - z.x0, z.y1 - z.y0); c.restore();
+  }
+  if (b) text(BATK_TIP[A.kind], b.x, G.map.ground - 250, 26, '#fff', 'center', OL);
+}
+function bossAtkDraw(A, t) {
+  const k = A.ph - A.warn, c = ctx, gy = G.map.ground, fade = Math.max(0, Math.min(1, (A.act - k) / 0.25));
+  c.save(); c.globalAlpha = fade;
+  if (A.kind === 'spore') for (const z of A.z) {
+    const x = (z.x0 + z.x1) / 2, f = Math.min(1, k / 0.3);
+    if (f < 1) { c.save(); c.translate(x, gy - 560 * (1 - f)); c.rotate(t * 6); hexa(c, 0, -12, 16, '#7ccf5a'); c.restore(); }
+    else for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; ell(c, x + Math.cos(a) * (20 + k * 60), gy - 20 + Math.sin(a) * 10 - k * 30, 9, 9); c.fillStyle = 'rgba(124,207,90,.7)'; c.fill(); }
+  } else if (A.kind === 'sweep') { // a tentacle whips along the floor from the boss
+    const z = A.z[0], len = (z.x1 - z.x0) * Math.min(1, k / 0.18), x0 = A.dir > 0 ? z.x0 : z.x1, y = gy - 32;
+    tentacle(c, x0, y, A.dir, len, t, 60, true);
+  } else if (A.kind === 'pillar') for (const z of A.z) { // tentacles burst up out of the floor
+    const x = (z.x0 + z.x1) / 2, hh = (z.y1 - z.y0) * Math.min(1, k / 0.15);
+    c.save(); c.translate(x, gy); c.rotate(-Math.PI / 2); tentacle(c, 0, 0, 1, hh, t + x, 40, false); c.restore();
+  } else { // 독가스: a green cloud round where the boss stood
+    const z = A.z[0];
+    for (let i = 0; i < 26; i++) {
+      const x = z.x0 + (z.x1 - z.x0) * hash2(i, A.n), y = z.y1 - (z.y1 - z.y0) * hash2(i + 40, A.n) * 0.85 - 20 - Math.sin(t * 2 + i) * 10, r = 34 + hash2(i, 7) * 40;
+      ell(c, x + Math.sin(t * 1.5 + i) * 14, y, r, r * 0.8); c.fillStyle = i % 3 ? 'rgba(140,200,60,.38)' : 'rgba(100,160,40,.42)'; c.fill();
+    }
+  }
+  c.restore();
+}
+function tentacle(c, x0, y, dir, len, t, w, suckers) { // a thick, tapering arm with a wobble; dir 1 grows to the right
+  if (len < 4) return;
+  const N = 16, pts = [];
+  for (let i = 0; i <= N; i++) { const u = i / N; pts.push([x0 + dir * len * u, y + Math.sin(u * 9 - t * 14) * 18 * u]); }
+  c.beginPath();
+  pts.forEach(([x, yy], i) => { const r = w / 2 * (1 - i / N * 0.8); i ? c.lineTo(x, yy - r) : c.moveTo(x, yy - r); });
+  for (let i = N; i >= 0; i--) { const [x, yy] = pts[i], r = w / 2 * (1 - i / N * 0.8); c.lineTo(x, yy + r); }
+  c.closePath(); fillS(c, '#7a3d8f', 3);
+  if (suckers) for (let i = 1; i < N; i += 2) { const [x, yy] = pts[i]; ell(c, x, yy + w * 0.2 * (1 - i / N * 0.8), 9 * (1 - i / N * 0.6), 6 * (1 - i / N * 0.6)); c.fillStyle = '#e8b8f5'; c.fill(); }
+  else for (let i = 1; i < N; i += 3) { const [x, yy] = pts[i]; ell(c, x, yy, 5, 5); c.fillStyle = '#d6a0ea'; c.fill(); }
+}
+
+// ---- 잠입 그림: the ghosts' paths (so the pattern can be read), the ghosts, signs and zone flags ------------------------------
+function sneakDraw(map, t) {
+  const c = ctx, nt = netT();
+  for (const [x, y, s] of map.signs) tag(s, x, y, '#463486');
+  map.cps.forEach((x, i) => {
+    if (!i) return; const y = groundBelow(x + 10, -9999), got = G.me.cp >= i;
+    c.beginPath(); c.moveTo(x, y); c.lineTo(x, y - 110); stroke(c, 4);
+    c.beginPath(); c.moveTo(x, y - 110); c.lineTo(x + 46, y - 96); c.lineTo(x, y - 82); c.closePath(); fillS(c, got ? '#ffd23f' : '#9b8fd0', 2.5);
+  });
+  c.save(); c.setLineDash([6, 10]); c.lineWidth = 3; c.strokeStyle = 'rgba(220,200,255,.45)';
+  for (const g of map.ghosts) { c.beginPath(); if (g[0] === 'h') { c.moveTo(g[1], g[3] - 34); c.lineTo(g[2], g[3] - 34); } else { c.moveTo(g[1], g[2] - 34); c.lineTo(g[1], g[3] - 34); } c.stroke(); }
+  c.restore();
+  map.ghosts.forEach((g, i) => { const p = ghostAt(g, nt); drawMon(c, 'urea', p.x, p.y, p.f, t + i); });
+}
+
+// ---- 발전소 그림 ---------------------------------------------------------------------------------------------------------------
+function plantDraw(map, t) {
+  const P = map.plant, gy = map.ground, c = ctx;
+  // 포도당 관 (from the blood): a red pipe that drips sugar
+  rr(c, P.glucose - 34, 330, 68, gy - 370, 16); fillS(c, '#c8323f', 3); rr(c, P.glucose - 22, 340, 14, gy - 400, 7); c.fillStyle = 'rgba(255,255,255,.25)'; c.fill();
+  hexa(c, P.glucose, gy - 30 + ((t * 40) % 20), 12, '#f4f0e0');
+  tag('포도당 받는 곳 (순환계에서)', P.glucose, 296, '#a32a35');
+  // 산소 방울 on the ledges
+  P.oxygen.forEach(([x, y], i) => {
+    const ready = G.t >= (G.o2[i] || 0), by = y - 50 + Math.sin(t * 3 + i) * 6;
+    ell(c, x, by, 24, 24); c.fillStyle = ready ? 'rgba(127,211,255,.35)' : 'rgba(255,255,255,.12)'; c.fill(); stroke(c, 2, ready ? '#7fd3ff' : 'rgba(255,255,255,.4)');
+    if (ready) drawItemIcon(c, 'oxygen', x, by, 1.5);
+    tag('산소 (호흡계에서)', x, y - 104, '#2f7fb5');
+  });
+  // 발전기 = 미토콘드리아: two membranes, the inner one folded
+  const ex = P.engine, ey = gy - 100, hot = G.t - (G.burn ?? -9) < 1.2, pul = hot ? 1 + 0.05 * Math.sin(t * 30) : 1;
+  c.save(); c.translate(ex, ey); c.scale(pul, pul);
+  if (hot) { ell(c, 0, 0, 200, 120); c.fillStyle = 'rgba(255,220,90,.35)'; c.fill(); }
+  ell(c, 0, 0, 150, 82); fillS(c, '#f2a33a', 4); ell(c, 0, 0, 132, 66); fillS(c, '#ffcf7a', 3);
+  c.beginPath(); c.moveTo(-120, 0); for (let i = 0; i < 8; i++) { const x = -120 + i * 30; c.lineTo(x + 8, i % 2 ? 40 : -40); c.lineTo(x + 22, i % 2 ? 40 : -40); c.lineTo(x + 30, 0); } stroke(c, 5, '#e07a1f');
+  c.restore();
+  tag('발전기 · 미토콘드리아 (포도당 + 산소 넣기)', ex, ey - 122, '#b8661a');
+  // 에너지가 쓰이는 곳
+  for (const [k, x, y, name] of P.uses) {
+    const tot = Math.min(killTotal(k), Q4() ? killNeed(k) : 0), need = Q4() ? killNeed(k) : 0, lit = G.used && G.used.x === x && G.t - G.used.t < 0.8;
+    rr(c, x - 36, y - 76, 72, 76, 12); fillS(c, lit ? '#fff3a0' : '#fff7e6', 3);
+    useIcon(c, k === 'heat' ? 'heat' : name, x, y - 38, t);
+    tag(`${name}${k === 'heat' ? ' (에너지의 약 60 %)' : ''}${need ? ` ${k === 'heat' ? tot : `(함께) ${tot}`}/${need}` : ''}`, x, y - 102, k === 'heat' ? '#c0462a' : '#7a5a20');
+  }
+  // 혈관 출구: water and CO₂ leave in the blood
+  rr(c, P.exit - 40, gy - 130, 80, 140, 18); fillS(c, '#5a62c8', 3);
+  c.beginPath(); c.moveTo(P.exit - 16, gy - 90); c.lineTo(P.exit + 16, gy - 90); c.lineTo(P.exit, gy - 50); c.closePath(); fillS(c, '#fff', 2);
+  tag('혈관 출구 (물 · 이산화 탄소 내보내기)', P.exit, gy - 160, '#3a3f8f');
+}
+function useIcon(c, k, x, y, t) {
+  c.save(); c.translate(x, y);
+  if (k === 'heat') { const f = 1 + Math.sin(t * 10) * 0.06; c.scale(f, f); c.beginPath(); c.moveTo(0, -26); c.bezierCurveTo(22, -6, 18, 22, 0, 24); c.bezierCurveTo(-18, 22, -22, -6, 0, -26); fillS(c, '#ff7a2a', 2.5); c.beginPath(); c.moveTo(0, -6); c.bezierCurveTo(10, 4, 8, 20, 0, 20); c.bezierCurveTo(-8, 20, -10, 4, 0, -6); c.fillStyle = '#ffd23f'; c.fill(); }
+  else if (k === '생장') { c.beginPath(); c.moveTo(0, 22); c.lineTo(0, -4); stroke(c, 4, '#3f8a3a'); leaf(c, 0, -2, 0.7); c.save(); c.scale(-1, 1); leaf(c, 0, 6, 0.6); c.restore(); }
+  else if (k === '근육 운동') { rr(c, -24, -12, 10, 24, 3); fillS(c, '#555c66', 2); rr(c, 14, -12, 10, 24, 3); fillS(c, '#555c66', 2); rr(c, -14, -3, 28, 6, 3); fillS(c, '#9aa3ad', 2); }
+  else if (k === '두뇌 활동') { ell(c, 0, 0, 24, 18); fillS(c, '#f2a0b4', 2.5); c.beginPath(); c.moveTo(-14, -4); c.quadraticCurveTo(-6, -14, 0, -4); c.quadraticCurveTo(6, 6, 14, -4); c.moveTo(0, -18); c.lineTo(0, 18); stroke(c, 2, '#b4566e'); }
+  else { c.beginPath(); c.moveTo(-18, -8); c.lineTo(-8, -8); c.lineTo(4, -18); c.lineTo(4, 18); c.lineTo(-8, 8); c.lineTo(-18, 8); c.closePath(); fillS(c, '#4f6fa8', 2); for (const r of [10, 18]) { c.beginPath(); c.arc(6, 0, r, -0.7, 0.7); stroke(c, 2.5, '#4f6fa8'); } }
+  c.restore();
+}
+function carried(m, t) { // what I am carrying in the 발전소, over my head
+  const c = G.carry, list = [c.g && 'glucose', c.o && 'oxygen', c.e && 'energy', c.w && 'water', c.w && 'co2'].filter(Boolean);
+  list.forEach((id, i) => drawItemIcon(ctx, id, m.x + (i - (list.length - 1) / 2) * 28, m.y - 96 + Math.sin(t * 4 + i) * 2, 1.1));
 }
 function drawPlant(lit) { // the 미토콘드리아 발전소 in town, by 미토
   const x = 1150, y = 800, c = ctx;
@@ -1476,11 +1677,11 @@ if (params.get('scene') === 'figures') { G.scene = 'figures'; show('none'); }
 else if (params.get('teacher')) teacher();
 else if (TRY) tryMap(TRY);
 else startLogin();
-function tryMap(id) { // a test run of one map: ?try=vessel | vesselH | lung | lungH | digest | kidney, &job=mage, &lv=10
-  const map = MAPS[id] ? id : 'vesselH', base = map.replace(/H$/, ''), q = { digest: 1, lung: 2, vessel: 3, kidney: 5 }[base] || 1;
+function tryMap(id) { // a test run of one map: ?try=vessel | vesselH | lung | lungH | digest | mito | kidney | lair, &job=mage, &lv=10
+  const map = MAPS[id] ? id : 'vesselH', base = map.replace(/H$/, ''), q = { digest: 1, lung: 2, vessel: 3, mito: 4, kidney: 5, lair: 6 }[base] || 1;
   const j = JOBS[params.get('job')] ? params.get('job') : 'warrior', lv = Math.max(1, Math.min(30, Number(params.get('lv')) || 5));
   S = { name: '시험', job: j, look: { g: 'boy' }, lv, exp: 0, inv: {}, quiz: 7, pid: '', lastSt: q, map, x: MAPS[map].portals[0].x + 60,
-    fl: { pro: 1, told: q, left: 1, loaded: base === 'vessel' ? 1 : 0, trials: {} } };
+    fl: { pro: 1, told: q, left: 1, loaded: base === 'vessel' ? 1 : 0, linked: 1, trials: {} } };
   go(1);
 }
 if (params.get('manual') === '1') drawFrame();

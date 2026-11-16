@@ -244,3 +244,9 @@
   licence: {id: MIT}
   date: 2026-11-16
   ships: true
+- path: assets/bg-mito.jpg
+  origin: ai
+  tool: "ElevenLabs image generation (flow GDDh7sKhAMM09xKV9k8j), converted to jpg with ffmpeg"
+  model: "gpt-image-2.5-sunburst"
+  date: 2026-11-17
+  ships: true

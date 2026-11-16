@@ -295,11 +295,12 @@ const THEME = {
   lung: { sky: ['#8fd0f5', '#e6f7ff'], top: '#ffc6d4', body: '#c7907e', edge: '#94604f' },
   vessel: { sky: ['#3a0710', '#8c1b25'], top: '#ff8f8f', body: '#c23a44', edge: '#7a1820' },
   kidney: { sky: ['#2c2357', '#7a62c4'], top: '#b9a6f5', body: '#6a52b0', edge: '#463486' },
+  mito: { sky: ['#5a2410', '#e09048'], top: '#ffd27a', body: '#c8742e', edge: '#8a4a1a' },
 };
 /** the far layers, drawn in screen space with parallax from the camera (cx, cy) */
 // painted backgrounds and the boss (assets/, made with an image model); until one loads, the drawn version shows
 const IMG = {};
-for (const k of ['town', 'digest', 'lung', 'vessel', 'kidney', 'boss']) { const im = new Image(); im.onload = () => { IMG[k] = im; if (k === 'boss') IMG.bossBox = opaqueBox(im); }; im.src = k === 'boss' ? 'assets/boss.png' : `assets/bg-${k}.jpg`; }
+for (const k of ['town', 'digest', 'lung', 'vessel', 'kidney', 'mito', 'boss']) { const im = new Image(); im.onload = () => { IMG[k] = im; if (k === 'boss') IMG.bossBox = opaqueBox(im); }; im.src = k === 'boss' ? 'assets/boss.png' : `assets/bg-${k}.jpg`; }
 function opaqueBox(im) { // the part of a cut-out picture that is not see-through
   const c = document.createElement('canvas'); c.width = im.width; c.height = im.height;
   const x = c.getContext('2d'); x.drawImage(im, 0, 0);
@@ -341,6 +342,9 @@ function drawBack(c, map, cx, cy, t, W, H, lit) {
   } else if (map.theme === 'vessel') {
     for (let i = 0; i < 10; i++) { const x = px(0.25, 1500) + i * 170 - 200; rr(c, x, 0, 60, H, 30); c.fillStyle = 'rgba(255,90,100,.08)'; c.fill(); }
     for (let i = 0; i < 16; i++) { const x = ((i * 157 - t * 90 - cx * 0.5) % (W + 100) + W + 100) % (W + 100) - 50, y = 80 + (i * 83) % (H - 300); rbc(c, x, y, 16, 0.25); }
+  } else if (map.theme === 'mito') { // inside the mitochondrion: folded inner membranes far off, sparks of energy drifting up
+    for (let i = 0; i < 9; i++) { const x = px(0.18, 1600) + i * 200 - 200, h = 260 + (i % 3) * 70; c.beginPath(); c.moveTo(x, H); for (let k = 0; k < 6; k++) c.lineTo(x + (k % 2 ? 50 : 0), H - (k + 1) * h / 6); c.lineWidth = 30; c.lineJoin = 'round'; c.strokeStyle = 'rgba(255,200,120,.16)'; c.stroke(); }
+    for (let i = 0; i < 22; i++) { const x = ((i * 173 - cx * 0.3) % W + W) % W, y = H - ((i * 131 + t * 40) % (H + 40)); star4(c, x, y, 3 + (i % 3), 'rgba(255,240,160,.7)', t + i); }
   } else if (map.theme === 'kidney') {
     for (let i = 0; i < 7; i++) { const x = px(0.2, 1400) + i * 220 - 200; c.beginPath(); c.moveTo(x, H); c.bezierCurveTo(x - 60, H - 300, x + 160, H - 380, x + 80, H - 520); c.lineWidth = 34; c.strokeStyle = 'rgba(180,160,255,.18)'; c.stroke(); }
     for (let i = 0; i < 20; i++) { const x = (i * 199) % W, y = (i * 113 + t * 60) % H; c.beginPath(); c.moveTo(x, y - 6); c.quadraticCurveTo(x + 5, y + 2, x, y + 5); c.quadraticCurveTo(x - 5, y + 2, x, y - 6); c.fillStyle = 'rgba(160,220,255,.4)'; c.fill(); }
@@ -450,12 +454,12 @@ function drawClot(c, x, y, t) { // 혈전: a rolling clump of platelets
   ell(c, 0, 0, 10, 10); fillS(c, '#a53a48', 2);
   c.restore();
 }
-function drawBlood(c, map, cx, cy, t, W) { // the 혈관 급류 at the bottom
-  const y = map.hazard;
+function drawBlood(c, map, cx, cy, t, W) { // the 혈관 급류 at the bottom (콩팥 정수장: 여과액, pale and bubbly)
+  const y = map.hazard, kid = map.theme === 'kidney';
   c.beginPath(); c.moveTo(cx, y + 2000);
   for (let x = cx - 40; x < cx + W + 40; x += 20) c.lineTo(x, y + Math.sin(x * 0.03 + t * 4) * 6);
-  c.lineTo(cx + W + 40, y + 2000); c.closePath(); c.fillStyle = '#9e1424'; c.fill(); stroke(c, 3);
-  for (let i = 0; i < 12; i++) rbc(c, cx + ((i * 173 + t * 160) % (W + 80)) - 40, y + 30 + (i % 3) * 22, 14);
+  c.lineTo(cx + W + 40, y + 2000); c.closePath(); c.fillStyle = kid ? '#8fa0e0' : '#9e1424'; c.fill(); stroke(c, 3);
+  for (let i = 0; i < 12; i++) if (kid) { ell(c, cx + ((i * 173 + t * 60) % (W + 80)) - 40, y + 24 + (i % 3) * 18, 6, 6); c.fillStyle = 'rgba(255,255,255,.6)'; c.fill(); } else rbc(c, cx + ((i * 173 + t * 160) % (W + 80)) - 40, y + 30 + (i % 3) * 22, 14);
 }
 function drawItemIcon(c, id, x, y, s = 1) {
   const it = ITEMS[id]; c.save(); c.translate(x, y); c.scale(s, s);
@@ -465,6 +469,7 @@ function drawItemIcon(c, id, x, y, s = 1) {
   else if (id === 'oxygen') { ell(c, -5, 0, 7, 7); fillS(c, it.color, 2); ell(c, 5, 0, 7, 7); fillS(c, it.color, 2); }
   else if (id === 'co2') { ell(c, -9, 0, 5, 5); fillS(c, '#e8504a', 2); ell(c, 0, 0, 6, 6); fillS(c, '#555c66', 2); ell(c, 9, 0, 5, 5); fillS(c, '#e8504a', 2); }
   else if (id === 'urea') { c.beginPath(); c.moveTo(-9, 8); c.bezierCurveTo(-11, -14, 11, -14, 9, 8); c.lineTo(-9, 8); fillS(c, it.color, 2); }
+  else if (id === 'water') { c.beginPath(); c.moveTo(0, -11); c.bezierCurveTo(9, 0, 9, 10, 0, 10); c.bezierCurveTo(-9, 10, -9, 0, 0, -11); fillS(c, it.color, 2); }
   else if (id === 'energy') { c.beginPath(); c.moveTo(3, -12); c.lineTo(-7, 2); c.lineTo(0, 2); c.lineTo(-3, 12); c.lineTo(8, -3); c.lineTo(1, -3); c.closePath(); fillS(c, it.color, 2); }
   else { rr(c, -9, -9, 18, 18, 6); fillS(c, it.color, 2); }
   c.restore();
