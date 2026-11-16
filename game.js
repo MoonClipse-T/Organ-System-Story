@@ -522,6 +522,11 @@ function onParty(pid, P) {
   else if (!was && (S.fl.seen || 0) < (G.P.st || 1) - 1) stepUp(S.fl.seen || 1, G.P.st); // came back to a party that moved on
   trialNote();
   orders(was, 'wipe'); orders(was, 'call');
+  { const Q = QUESTS[stage()], q = stage(), now = (G.P.dn && G.P.dn[q]) || {}, before = (was && was.dn && was.dn[q]) || {};
+    if (Q && Q.one && was && (was.st || 1) === q && !Object.keys(before).length && Object.keys(now).length && !now[G.id]) {
+      const who = (G.P.m[Object.keys(now)[0]] || {}).n || '파티원'; SFX.quest();
+      G.banner = { big: `${who} 통과!`, small: isLeader() ? '파티 모두 성공이에요. 파티장은 오른쪽 위 [답 쓰기]로 답을 내요.' : '파티 모두 성공이에요. 파티장이 답을 써요.', t: 5 };
+    } }
   refreshParty(); hud(); save();
 }
 function stepUp(from, to) { // a mission is done: back to town, cards for every step cleared, then the chief says where next
@@ -618,10 +623,12 @@ function refreshParty() {
 }
 
 // ---- Quest steps: my task → everyone's done → leader writes → teacher OKs -----------------------------------
-const myDone = () => { const Q = QUESTS[stage()]; if (Q && Q.kill && !Q.also) return killsDone(); return !!(G.P && G.P.dn && G.P.dn[stage()] && G.P.dn[stage()][G.id]); };
-const allDone = () => { // hunting: the shared count; everything else (and 날숨): every member
-  const q = stage(), Q = QUESTS[q], dn = (G.P && G.P.dn && G.P.dn[q]) || {};
+const doneBy = () => (G.P && G.P.dn && G.P.dn[stage()]) || {};
+const myDone = () => { const Q = QUESTS[stage()]; if (Q && Q.kill && !Q.also) return killsDone(); if (Q && Q.one) return memberIds().some(id => doneBy()[id]); return !!doneBy()[G.id]; };
+const allDone = () => { // hunting: the shared count · 점프 · 컨트롤 맵 (one): any one of us · everything else (and 날숨): every member
+  const q = stage(), Q = QUESTS[q], dn = doneBy();
   if (Q.kill && !killsDone()) return false;
+  if (Q.one) return memberIds().some(id => dn[id]);
   return Q.kill && !Q.also ? true : memberIds().every(id => dn[id]);
 };
 // 답: sub/<q> = { a, by, t, n } (n-th try) · gr/<q> = { ok, c, t } from the teacher, for the answer it is newer than
@@ -635,7 +642,7 @@ function markDone() { // my part of this step is finished
   const q = stage();
   if (G.net && S.pid) G.net.set(`pty/${S.pid}/dn/${q}/${G.id}`, 1);
   else if (G.P) { G.P.dn = G.P.dn || {}; (G.P.dn[q] = G.P.dn[q] || {})[G.id] = 1; }
-  SFX.quest(); toast(QUESTS[q].ask ? (memberIds().length > 1 ? '내 몫 끝! 파티원이 모두 끝내면 파티장이 답을 써요.' : '퀘스트 끝! 이제 답을 써요 (한 번만 낼 수 있어요).') : '완료!');
+  SFX.quest(); toast(QUESTS[q].one && memberIds().length > 1 ? '통과! 한 명만 통과해도 파티 모두 성공이에요. 파티장이 답을 써요.' : QUESTS[q].ask ? (memberIds().length > 1 ? '내 몫 끝! 파티원이 모두 끝내면 파티장이 답을 써요.' : '퀘스트 끝! 이제 답을 써요 (한 번만 낼 수 있어요).') : '완료!');
   hud(); refreshParty(); save();
   setTimeout(() => { if (allDone() && isLeader() && QUESTS[q].ask) answerBox(); }, 400);
 }
@@ -673,26 +680,44 @@ function answerBox(q0, again) { // the leader writes the party's answer: once, t
 }
 
 // ---- 거짓말 탐지기: the teacher's trial for one party ---------------------------------------------------------
+// 거짓말 탐지기: the teacher sends a sentence; every member types it exactly on their own tablet before the time runs out.
+// No teacher judging: the tablet checks it. ta/<trial>/<me> = { ok, n, t }  (ok false: time ran out)
+const normLine = s => String(s || '').normalize('NFC').replace(/\s+/g, ' ').trim();
 function trialNote() {
-  const tr = G.P && G.P.tr; if (!tr || !tr.id) return;
-  const v = G.P.tv && G.P.tv[tr.id], ans = G.P.ta && G.P.ta[tr.id];
+  const tr = G.P && G.P.tr; if (!tr || !tr.id || !tr.q) return;
   if (S.fl.trials[tr.id]) return; // already settled on this tablet
-  if (v) { S.fl.trials[tr.id] = v.ok ? 'ok' : 'no'; closeTrial(); v.ok ? trialPass() : trialFail('운영자가 탈락시켰어요!'); return; }
+  const mine = G.P.ta && G.P.ta[tr.id] && G.P.ta[tr.id][G.id]; if (mine) { S.fl.trials[tr.id] = mine.ok ? 'ok' : 'no'; return; }
+  if (G.trial && G.trial.id === tr.id) return; // already on screen
+  if ((G.net ? G.net.now() : Date.now()) > tr.t + tr.d * 1000) { S.fl.trials[tr.id] = 'late'; return; } // came back after it was over
   G.trial = tr; const box = $('#trial'); box.classList.remove('hide'); SFX.alarm();
-  box.innerHTML = `<div class="tin"><small>⚠ 운영자 시련 · 거짓말 탐지기</small><h2>${esc(tr.q)}</h2><div class="tbar"><i id="trBar"></i></div><b id="trLeft"></b>`
-    + (ans ? `<p class="sent">${esc(ans.by)}님이 답했어요: “${esc(ans.a)}”<br>운영자 판정을 기다리는 중…</p>` : `<textarea id="trT" rows="3" placeholder="파티원 누구든 답을 써요"></textarea><button id="trGo" class="go">답하기</button>`) + '</div>';
-  if (!ans) $('#trGo').onclick = () => { const a = $('#trT').value.trim(); if (!a) return; if (G.net) G.net.set(`pty/${S.pid}/ta/${tr.id}`, { a, by: S.name, t: G.net.now() }); };
+  box.innerHTML = `<div class="tin"><small>⚠ 운영자 시련 · 거짓말 탐지기</small><p class="tl">아래 문장을 <b>오타 없이 똑같이</b> 쳐요!</p><h2 class="tq">${esc(tr.q)}</h2><div class="tbar"><i id="trBar"></i></div><b id="trLeft"></b>`
+    + `<textarea id="trT" rows="2" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="여기에 그대로 쳐요 (붙여넣기는 안 돼요)"></textarea><p id="trMsg" class="sent"></p><button id="trGo" class="go">확인</button></div>`;
+  const T = $('#trT'), want = normLine(tr.q);
+  ['paste', 'drop'].forEach(e => T.addEventListener(e, ev => { ev.preventDefault(); $('#trMsg').textContent = '붙여넣기는 안 돼요. 직접 쳐요!'; }));
+  const check = final => {
+    const got = normLine(T.value);
+    if (got === want) { trialDone(tr, true); return; }
+    let k = 0; while (k < got.length && got[k] === want[k]) k++;
+    $('#trMsg').textContent = !got ? '' : k < got.length ? (final ? `오타가 있어요! ${k + 1}번째 글자부터 달라요.` : `${k}글자까지 맞아요…`) : `${k} / ${want.length}글자 맞아요`;
+  };
+  T.oninput = () => check(false); $('#trGo').onclick = () => check(true);
+  setTimeout(() => T.focus(), 50);
+}
+function trialDone(tr, ok) {
+  if (S.fl.trials[tr.id]) return; S.fl.trials[tr.id] = ok ? 'ok' : 'late';
+  if (G.net && S.pid) G.net.set(`pty/${S.pid}/ta/${tr.id}/${G.id}`, { ok, n: S.name, t: G.net.now() });
+  closeTrial(); ok ? trialPass() : trialFail('시간 안에 오타 없이 치지 못했어요!'); save();
 }
 function trialTick() {
   if (!G.trial) return;
-  const tr = G.trial, left = tr.t + tr.d * 1000 - (G.net ? G.net.now() : Date.now()), answered = G.P && G.P.ta && G.P.ta[tr.id];
+  const tr = G.trial, left = tr.t + tr.d * 1000 - (G.net ? G.net.now() : Date.now());
   const bar = $('#trBar'); if (bar) bar.style.width = `${Math.max(0, left / (tr.d * 1000)) * 100}%`;
-  const l = $('#trLeft'); if (l) l.textContent = answered ? '' : `${Math.max(0, Math.ceil(left / 1000))}초`;
-  if (left <= 0 && !answered) { S.fl.trials[tr.id] = 'late'; closeTrial(); trialFail('시간 안에 답하지 못했어요!'); }
+  const l = $('#trLeft'); if (l) l.textContent = `${Math.max(0, Math.ceil(left / 1000))}초`;
+  if (left <= 0) trialDone(tr, false);
 }
 function closeTrial() { G.trial = null; $('#trial').classList.add('hide'); }
-function trialPass() { SFX.quest(); gainExp(30); G.banner = { big: '시련 통과!', small: '운영자가 인정했어요 · EXP +30', t: 3 }; }
-function trialFail(why) { SFX.hurt(); G.banner = { big: '시련 탈락', small: `${why} 세포 마을로 돌아가요.`, t: 4, boss: true }; if (G.mapId !== 'town') enterMap('town', 300); save(); }
+function trialPass() { SFX.quest(); gainExp(30); G.banner = { big: '시련 통과!', small: '오타 없이 정확하게 쳤어요 · EXP +30', t: 3 }; }
+function trialFail(why) { SFX.hurt(); if (G.mapId !== 'town') enterMap('town', 300); G.banner = { big: '시련 탈락', small: `${why} 세포 마을로 돌아가요.`, t: 4, boss: true }; save(); }
 
 // ---- Telling the channel where I am ---------------------------------------------------------------------------
 function sendMe(force) {
@@ -1029,7 +1054,7 @@ function hud() {
     state = ug.length ? `<span class="wait">선생님이 답을 확인하는 중 (${ug.length}개 남음)</span>` : '<span class="done">세균 소굴 포탈로!</span>';
     if (rw.length) state += rw.map(k => isLeader() ? `<button class="go small" data-rw="${k}">다시 쓰기: ${SYS[QUESTS[k].sys].name}</button>` : `<span class="back">다시 써야 해요: ${SYS[QUESTS[k].sys].name}</span>`).join('');
   }
-  if (S.fl.pro && !told()) { prog = ''; state = '<span class="wait">셀리 촌장에게 가서 다음에 갈 곳 듣기</span>'; }
+  if (S.fl.pro && !told() && !(Q.ask && allDone())) { prog = ''; state = '<span class="wait">셀리 촌장에게 가서 다음에 갈 곳 듣기</span>'; }
   $('#quest').innerHTML = `<b>${S.fl.pro ? (Q.id === 'boss' ? '최종 · ' : `퀘스트 ${q} · `) : ''}${Q.title}</b><p>${S.fl.pro ? Q.go : '셀리 촌장에게 말 걸기'}</p>${prog}${state}`;
   const qa = $('#qAns'); if (qa) qa.onclick = () => answerBox();
   $('#quest').querySelectorAll('[data-rw]').forEach(b => b.onclick = () => answerBox(+b.dataset.rw, true));
@@ -1298,7 +1323,7 @@ async function teacher() {
           + `<td class="tb"><button data-town="${id}">마을로</button><select data-dk="mv:${id}" data-mv="${id}">${opts(id)}</select>${P && !P.solo ? `<button data-kick="${pidOf[id]}:${id}">혼자로</button>` : ''}</td></tr>`;
       }).join('') + '</table>' : '<p class="tip">이 채널에 접속한 학생이 없어요.</p>') + '</section>';
     const cards = parties.map(([pid, P]) => {
-      const q = P.st || 1, ug = ugOf(P), br = P.br, tr = P.tr, ta = tr && P.ta && P.ta[tr.id], tv = tr && P.tv && P.tv[tr.id];
+      const q = P.st || 1, ug = ugOf(P), br = P.br, tr = P.tr, ta = (tr && P.ta && P.ta[tr.id]) || {};
       const ans = ASKQ.map(k => {
         const Q = QUESTS[k], sb = P.sub && P.sub[k], g = P.gr && P.gr[k], cur = sb && g && g.t >= sb.t ? g : null, S2 = SYS[Q.sys];
         if (!sb) return `<div class="an none"><b style="--c:${S2.color}">${S2.name}</b><p>${q > k ? '(답 없음)' : '아직 이 미션 전'}</p></div>`;
@@ -1311,8 +1336,8 @@ async function teacher() {
       return `<section class="pty ${ug.length ? 'wait' : ''}"><h3>${P.solo ? '혼자 · ' : ''}${esc(P.nm)} <small>${Object.keys(P.m).length}명 · ${P.lock ? '출발함' : '마을에서 모이는 중'} · ${stName(q)}${ug.length ? ` · <b>확인할 답 ${ug.length}</b>` : ''}</small></h3>
         <div class="mem">${Object.entries(P.m).map(([id, m]) => `<span class="${live(id) ? '' : 'off'}">${P.L === id ? '★' : ''}${esc(m.n)} <small>${JOBS[m.j]?.name || ''} · Lv.${ps[id]?.lv ?? '?'} · ${live(id) ? mapName(ps[id].m) : '접속 끊김'}</small><button data-kick="${pid}:${id}" title="파티에서 빼기 (혼자로)">×</button></span>`).join('')}</div>
         <div class="anl">${ans}</div>
-        <div class="tb trl"><input data-dk="tq:${pid}" placeholder="거짓말 탐지기 질문 (예: 융털이 하는 일은?)"><input data-dk="ts:${pid}" class="sec" placeholder="${tune.trial_secs}" type="number">초<button data-tr="${pid}">시련 보내기</button></div>
-        ${tr ? `<div class="ans trial"><b>시련: ${esc(tr.q)}</b>${tv ? `<p>${tv.ok ? '통과시킴' : '탈락시킴'}</p>` : ta ? `<p>“${esc(ta.a)}” <small>— ${esc(ta.by)}</small></p><div class="tb"><button data-tv="${pid}:${tr.id}:1" class="okb">통과</button><button data-tv="${pid}:${tr.id}:0">탈락</button></div>` : now > tr.t + tr.d * 1000 ? '<p>시간 안에 답하지 못해 탈락</p>' : '<p>답을 기다리는 중…</p>'}</div>` : ''}
+        <div class="tb trl"><input data-dk="tq:${pid}" placeholder="거짓말 탐지기: 학생이 그대로 칠 문장"><input data-dk="ts:${pid}" class="sec" placeholder="${tune.trial_secs}" type="number">초<button data-tr="${pid}">보내기</button><button data-trr="${pid}">랜덤으로 보내기</button></div>
+        ${tr && tr.q ? `<div class="ans trial"><b>시련: “${esc(tr.q)}”</b> <small>${tr.d}초 · ${now > tr.t + tr.d * 1000 ? '끝남' : `${Math.ceil((tr.t + tr.d * 1000 - now) / 1000)}초 남음`}</small><div class="mem">${Object.entries(P.m).map(([id, m]) => { const r = ta[id]; return `<span>${esc(m.n)} <small>${r ? (r.ok ? `✓ 통과 (${Math.round((r.t - tr.t) / 1000)}초)` : '✗ 시간 초과 → 마을로') : now > tr.t + tr.d * 1000 ? '— (그때 접속 안 함)' : '치는 중…'}</small></span>`; }).join('')}</div></div>` : ''}
         <div class="tb">${boss}<button data-call="${pid}">모두 마을로</button><button data-st="${pid}:${Math.max(1, q - 1)}">단계 −1</button><button data-st="${pid}:${Math.min(QUESTS.length - 1, q + 1)}">단계 +1</button><button data-del="${pid}" class="warn">파티 해산</button></div></section>`;
     }).join('');
     $('#tChans').innerHTML = rosterHtml + cards + `<div class="tb"><button data-wipe="${ch}" class="warn">채널 ${ch} 기록 모두 지우기</button></div>`;
@@ -1329,8 +1354,9 @@ async function teacher() {
       if (P.solo) { n.del(`pty/${pid}/solo`); n.set(`pty/${pid}/nm`, `${P.nm}의 파티`); }
       n.set('cmd/' + id, { k: 'join', pid, t: T() });
     });
-    on('[data-tr]', b => { const pid = b.dataset.tr, q = (drafts['tq:' + pid] || '').trim(); if (!q) return; n.set(`pty/${pid}/tr`, { id: 't' + T(), q, t: T(), d: Number(drafts['ts:' + pid]) || tune.trial_secs }); drafts['tq:' + pid] = ''; });
-    on('[data-tv]', b => { const [pid, id, ok] = b.dataset.tv.split(':'); n.set(`pty/${pid}/tv/${id}`, { ok: ok === '1', t: T() }); });
+    const sendTrial = (pid, q) => { n.set(`pty/${pid}/tr`, { id: 't' + T(), q, t: T(), d: Number(drafts['ts:' + pid]) || tune.trial_secs }); drafts['tq:' + pid] = ''; dirty = true; setTimeout(render, 150); };
+    on('[data-tr]', b => { const pid = b.dataset.tr, q = (drafts['tq:' + pid] || '').replace(/\s+/g, ' ').trim(); if (q) sendTrial(pid, q); });
+    on('[data-trr]', b => sendTrial(b.dataset.trr, TRIAL_LINES[rand(TRIAL_LINES.length)]));
     on('[data-st]', b => { const [pid, st] = b.dataset.st.split(':'); n.set(`pty/${pid}/st`, +st); });
     on('[data-kick]', b => { const [pid, id] = b.dataset.kick.split(':'); if (confirm('이 학생을 파티에서 뺄까요? (지금까지의 단계와 답은 그대로 가지고 혼자 계속해요)')) n.del(`pty/${pid}/m/${id}`); });
     on('[data-del]', b => { if (confirm('이 파티를 해산할까요? 학생들은 각자 지금 단계부터 혼자 계속해요.')) n.del('pty/' + b.dataset.del); });

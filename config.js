@@ -31,7 +31,7 @@ window.CONFIG = {
   aggro_speed: { value: 1.7, min: 1, max: 3, step: 0.1 },    // × its walk speed while chasing
   drop_rate: { value: 0.6, min: 0.1, max: 1, step: 0.05 },
   respawn: { value: 8, min: 1, max: 30, step: 1 },           // seconds for a monster to come back
-  trial_secs: { value: 60, min: 15, max: 300, step: 5 },     // 거짓말 탐지기: seconds to answer
+  trial_secs: { value: 45, min: 10, max: 300, step: 5 },     // 거짓말 탐지기: seconds to type the sentence
   toxin_every: { value: 4, min: 1, max: 20, step: 0.5 },     // boss without 배설계: one toxin stack per this many seconds
   suffocate: { value: 0.025, min: 0, max: 0.2, step: 0.005 }, // boss without 호흡계: share of max HP lost a second
   boss_hp_per_player: { value: 4000, min: 500, max: 20000, step: 250 }, // 6 students ≈ 1~2 minutes of fighting
