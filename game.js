@@ -158,8 +158,9 @@ function show(id) { document.querySelectorAll('.screen').forEach(s => s.classLis
 function startLogin() {
   show('login'); G.scene = 'login';
   const sv = loadSave(), auto = sget('bq:auto');
-  $('#chans').innerHTML = [1, 2, 3, 4, 5].map(n => `<button class="chan" data-ch="${n}">채널 ${n}</button>`).join('');
-  let ch = Number(sget('bq:ch')) || 1;
+  $('#chans').innerHTML = chanList().map(n => `<button class="chan" data-ch="${n}">채널 ${n}</button>`).join('');
+  let ch = Number(sget('bq:ch')) || 0; // first time: a random channel, so nobody piles into 채널 1
+  if (!(ch >= 1 && ch <= CHANNELS)) ch = 1 + Math.floor(Math.random() * CHANNELS);
   const mark = () => document.querySelectorAll('.chan').forEach(b => b.classList.toggle('sel', +b.dataset.ch === ch));
   document.querySelectorAll('.chan').forEach(b => b.onclick = () => { ch = +b.dataset.ch; mark(); }); mark();
   const R = $('#room'), msg = $('#roomMsg'), solo = !!params.get('offline');
@@ -1069,20 +1070,29 @@ async function teacher() {
   const nets = {}, data = {}, drafts = {};
   let ch = 1, dirty = true;
   const T = () => nets[ch].now();
-  $('#tTabs').innerHTML = [1, 2, 3, 4, 5].map(n => `<button class="chan" data-tc="${n}">채널 ${n}</button>`).join('');
+  $('#tTabs').innerHTML = chanList().map(n => `<button class="chan" data-tc="${n}">채널 ${n}</button>`).join('');
   document.querySelectorAll('[data-tc]').forEach(b => b.onclick = () => { ch = +b.dataset.tc; dirty = true; render(); });
-  for (let c = 1; c <= 5; c++) {
-    try { nets[c] = await netConnect(chanBase(c, room.code), m => { $('#tState').textContent = m; }); } catch (e) { $('#tState').textContent = '연결 실패: 학교 와이파이를 확인해 주세요.'; return; }
+  try { // all channels at once: one by one, ten of them took too long
+    const all = await Promise.all(chanList().map(c => netConnect(chanBase(c, room.code), m => { $('#tState').textContent = m; })));
+    all.forEach((n, i) => { nets[i + 1] = n; });
+  } catch (e) { $('#tState').textContent = '연결 실패: 학교 와이파이를 확인해 주세요.'; return; }
+  for (const c of chanList()) {
     data[c] = { p: {}, pty: {} };
-    nets[c].onKids('p', p => { data[c].p = p || {}; if (c === ch) dirty = true; });
-    nets[c].on('pty', p => { data[c].pty = p || {}; if (c === ch) { dirty = true; render(); } });
+    nets[c].onKids('p', p => { data[c].p = p || {}; dirty = true; });
+    nets[c].on('pty', p => { data[c].pty = p || {}; dirty = true; if (c === ch) render(); });
   }
   $('#tState').textContent = `연결됨 (${nets[1].mode}) · 학생 답안이 오면 여기에 떠요.`;
   function render() {
     if (!dirty || !nets[ch] || !data[ch]) return; dirty = false;
     const keep = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.dk; // keep what the teacher is typing
     document.querySelectorAll('[data-dk]').forEach(el => { drafts[el.dataset.dk] = el.value; });
-    document.querySelectorAll('[data-tc]').forEach(b => b.classList.toggle('sel', +b.dataset.tc === ch));
+    document.querySelectorAll('[data-tc]').forEach(b => { // each tab: how many are in it, and answers waiting there
+      const c = +b.dataset.tc, d = data[c], t = nets[c] ? nets[c].now() : 0;
+      const n = d ? Object.values(d.p).filter(p => p && t - p.t < tune.stale_ms).length : 0;
+      const w = d ? Object.values(d.pty).filter(P => { if (!P || !P.m) return false; const q = P.st || 1, sb = P.sub && P.sub[q], r = P.rv && P.rv[q]; return sb && (!r || r.t < sb.t); }).length : 0;
+      b.innerHTML = `채널 ${c} <small>${n}명</small>${w ? ` <i>답 ${w}</i>` : ''}`;
+      b.classList.toggle('sel', c === ch); b.classList.toggle('wait', w > 0);
+    });
     const D = data[ch], now = T(), ps = D.p, live = id => ps[id] && now - ps[id].t < tune.stale_ms;
     const parties = Object.entries(D.pty).filter(([, P]) => P && P.m).sort((a, b) => (b[1].st || 0) - (a[1].st || 0));
     const loners = Object.entries(ps).filter(([id, p]) => live(id) && !p.pid);
@@ -1198,7 +1208,7 @@ $('#bMute').onclick = () => setMuted(!muted);
 $('#bParty').onclick = () => { $('#partyPanel').classList.toggle('hide'); refreshParty(); };
 $('#bChan').onclick = () => {
   const P = $('#chanPanel'); P.classList.toggle('hide');
-  P.innerHTML = '<h3>채널 바꾸기</h3>' + (S.fl.left ? '<p class="tip">출발한 뒤에는 채널을 바꿀 수 없어요 (파티가 이 채널에 있어요).</p>' : [1, 2, 3, 4, 5].map(n => `<button class="chan ${n === G.ch ? 'sel' : ''}" data-c="${n}">채널 ${n}</button>`).join('') + '<p class="tip">채널을 바꾸면 파티에서 나가요.</p>');
+  P.innerHTML = '<h3>채널 바꾸기</h3>' + (S.fl.left ? '<p class="tip">출발한 뒤에는 채널을 바꿀 수 없어요 (파티가 이 채널에 있어요).</p>' : chanList().map(n => `<button class="chan ${n === G.ch ? 'sel' : ''}" data-c="${n}">채널 ${n}</button>`).join('') + '<p class="tip">채널을 바꾸면 파티에서 나가요.</p>');
   P.querySelectorAll('[data-c]').forEach(b => b.onclick = () => { const n = +b.dataset.c; if (n === G.ch) return; leaveParty(true); if (G.net) G.net.del('p/' + G.id); save(); sset('bq:ch', n); sset('bq:auto', '1'); location.reload(); });
 };
 $('#bLeave').onclick = () => leaveParty(false);

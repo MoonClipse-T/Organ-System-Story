@@ -130,6 +130,9 @@
   #tRoomBar em { font-style: normal; font-size: 18px; color: #7be08f; } #tRoomBar em.off { color: #ff8a95; }
   #tRoomBar button { margin-left: auto; background: #6a3040; color: #fff; font-size: 17px; padding: 10px 16px; border-radius: 12px; } #tRoomBar button.on { background: #3a9d5d; }
   #tOpenBtns { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; } #tAgain { background: #33416f; color: #fff; font-size: 18px; padding: 12px 18px; border-radius: 12px; border: 2px solid #5b6ea8; }
+  #chans { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 14px auto 0; width: 92%; } #chans .chan { padding: 10px 4px; }
+  #tTabs .chan small { color: inherit; opacity: .75; font-size: 13px; } #tTabs .chan i { font-style: normal; background: var(--gold); color: #3a1d00; border-radius: 8px; padding: 0 6px; font-size: 13px; } #tTabs .chan.wait { border-color: var(--gold); }
+  #chanPanel { max-width: 92vw; }
   #closed .win { width: min(560px, 92vw); padding: 26px 28px; text-align: center; }
   .fld { display: flex; align-items: center; gap: 10px; width: 86%; margin: 0 auto 10px; } .fld span { width: 78px; flex: none; text-align: right; font-size: 19px; color: #cfe0ff; } .fld input { flex: 1; width: auto; min-width: 0; }
   #room { letter-spacing: 6px; }
@@ -191,10 +194,10 @@
 <div id="closed" class="screen hide"><div class="win"><h1 style="font-size:36px">게임이 닫혔어요</h1><p class="sub">선생님이 방을 닫았어요. 레벨과 직업은 이 디벗에 그대로 남아요.</p><button id="bBack" class="go">처음 화면으로</button></div></div>
 <div id="none" class="screen hide"></div>
 
-<script src="config.js?v=20261116b"></script>
-<script src="data.js?v=20261116b"></script>
-<script src="art.js?v=20261116b"></script>
-<script src="net.js?v=20261116b"></script>
-<script src="game.js?v=20261116b"></script>
+<script src="config.js?v=20261116c"></script>
+<script src="data.js?v=20261116c"></script>
+<script src="art.js?v=20261116c"></script>
+<script src="net.js?v=20261116c"></script>
+<script src="game.js?v=20261116c"></script>
 </body>
 </html>
