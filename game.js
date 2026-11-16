@@ -204,24 +204,30 @@ function startLogin() {
   };
   if (auto && sv && sv.job) { sset('bq:auto', ''); S = sv; go(ch); }
 }
+const rand = n => { try { return crypto.getRandomValues(new Uint32Array(1))[0] % n; } catch (e) { return Math.floor(Math.random() * n); } }; // not rng(): that one is the same on every tablet
+const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = rand(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+function pickQuiz() { // a different set, order and choice order for every student, so answers cannot be passed along by number
+  return shuffle(QUIZ).slice(0, QUIZ_N).map(Q => { const o = shuffle(Q.a.map((a, k) => k)); return { q: Q.q, a: o.map(k => Q.a[k]), c: o.indexOf(Q.c) }; });
+}
 function startQuiz() {
   show('quiz'); G.scene = 'quiz';
   let i = 0, right = 0;
+  const LIST = pickQuiz();
   const ask = () => {
-    const Q = QUIZ[i];
-    $('#qn').textContent = `입장 문제 ${i + 1} / ${QUIZ.length}`; $('#qq').textContent = Q.q;
-    $('#qbar').style.width = `${(i / QUIZ.length) * 100}%`;
+    const Q = LIST[i];
+    $('#qn').textContent = `입장 문제 ${i + 1} / ${LIST.length}`; $('#qq').textContent = Q.q;
+    $('#qbar').style.width = `${(i / LIST.length) * 100}%`;
     $('#qa').innerHTML = Q.a.map((a, k) => `<button data-k="${k}"><b>${k + 1}</b> ${esc(a)}</button>`).join('');
     $('#qa').querySelectorAll('button').forEach(b => b.onclick = () => {
       const k = +b.dataset.k; if ($('#qa').dataset.lock) return; $('#qa').dataset.lock = 1;
       const ok = k === Q.c; if (ok) { right++; SFX.pick(); } else SFX.hurt();
-      b.classList.add(ok ? 'ok' : 'no'); $('#qa').children[Q.c].classList.add('ok');
-      setTimeout(() => { delete $('#qa').dataset.lock; i++; if (i < QUIZ.length) ask(); else done(); }, ok ? 650 : 1300);
+      b.classList.add(ok ? 'ok' : 'no'); // the right one is not shown: nothing to pass on to a friend
+      setTimeout(() => { delete $('#qa').dataset.lock; i++; if (i < LIST.length) ask(); else done(); }, ok ? 650 : 900);
     });
   };
   const done = () => {
     S.quiz = right;
-    $('#qq').innerHTML = `${QUIZ.length}문제 중 <b>${right}</b>개 정답!<br>공격력 <b>${atkPower()}</b> <small>(정답이 많을수록 세요 · 이 공격력은 끝까지 그대로예요)</small>`;
+    $('#qq').innerHTML = `${LIST.length}문제 중 <b>${right}</b>개 정답!<br>공격력 <b>${atkPower()}</b> <small>(정답이 많을수록 세요 · 이 공격력은 끝까지 그대로예요)</small>`;
     $('#qbar').style.width = '100%'; $('#qn').textContent = '입장 문제 끝';
     $('#qa').innerHTML = '<button class="go">직업 고르러 가기</button>'; $('#qa .go').onclick = startJob;
     events.push({ type: 'quiz', right });
@@ -646,7 +652,7 @@ function answerBox(q0, again) { // the leader writes the party's answer: once, t
   box.innerHTML = `<div class="cin" style="--c:${SYS[Q.sys].color}"><small>${SYS[Q.sys].name} · ${again ? '다시 쓰기' : '파티 답안'}</small><h2>${esc(Q.title)}</h2>`
     + `<p class="once">${again ? '다시 낼 수 있는 기회도 <b>1회</b>예요.' : '답은 <b>1회</b>만 낼 수 있어요. 낸 뒤에는 고칠 수 없어요.'} 글자 수 제한은 없으니 아는 만큼 자세히 써요.</p><p class="qask">${esc(Q.ask)}</p>`
     + (again && old ? `<p class="back">지난 답: “${esc(old.a)}”${g && g.c ? `<br>선생님: ${esc(g.c)}` : ''}</p>` : '')
-    + `<textarea id="ansT" rows="5" placeholder="교과서를 보며 파티원과 의논해서 써요. 틀리면 보스전에서 이 기관계가 말썽을 부려요!"></textarea><div class="row"><button id="ansX">나중에</button><button id="ansGo" class="go">${again ? '다시 내기' : '답 내기'}</button></div></div>`;
+    + `<textarea id="ansT" rows="5" placeholder="교과서를 보며 파티원과 의논해서 써요."></textarea><div class="row"><button id="ansX">나중에</button><button id="ansGo" class="go">${again ? '다시 내기' : '답 내기'}</button></div></div>`;
   $('#ansX').onclick = () => { box.classList.add('hide'); G.modal = false; };
   $('#ansGo').onclick = () => {
     const a = $('#ansT').value.trim(); if (!a) { $('#ansT').placeholder = '답을 써 주세요!'; return; }
@@ -1065,7 +1071,7 @@ function drawPlay() {
     for (let i = 0; i < 18; i++) { const x = cam.x + ((i * 211 + beatPh() * 2400) % (W + 200)) - 100, y = cam.y + 120 + (i * 97) % (H - 200); ctx.beginPath(); ctx.moveTo(x - 70, y); ctx.lineTo(x, y); ctx.stroke(); }
     ctx.restore();
   }
-  for (const p of map.portals) { if (!portalShown(p)) continue; const py = p.y || map.ground || groundBelow(p.x, 0); const op = portalOpen(p); if (!op) ctx.globalAlpha = 0.45; drawPortal(ctx, p.x, py, t); ctx.globalAlpha = 1; if (p.label) tag(p.label + (op ? '' : ' (잠김)'), p.x, py - 112, !op ? '#555' : p.boss ? '#8a1f2a' : '#1f5f8a'); }
+  for (const p of map.portals) { if (!portalShown(p)) continue; const py = p.y || map.ground || groundBelow(p.x, 0); const op = portalOpen(p); if (!op) ctx.globalAlpha = 0.45; drawPortal(ctx, p.x, py, t); ctx.globalAlpha = 1; if (p.label && op) tag(p.label, p.x, py - 112, p.boss ? '#8a1f2a' : '#1f5f8a'); } // a locked portal: dim, no label
   for (const [id, x, y] of map.npcs) { drawNpc(ctx, id, x, y, t, lit); tag(NPCS[id].name, x, y + 16, '#2d6a3e'); if (questMark(id)) bang(x, y - 110, t); }
   if (map.clots) for (const c of map.clots) drawClot(ctx, clotX(c), c[1], t);
   if (map.gim) {
@@ -1134,7 +1140,6 @@ function drawPlant(lit) { // the 미토콘드리아 발전소 in town, by 미토
   }
   if (lit) for (let i = 0; i < 5; i++) { const a = G.t * 2 + i * 1.26; star4(c, Math.cos(a) * 150, -110 + Math.sin(a) * 95, 7, '#fff3a0', G.t); }
   c.restore();
-  tag('미토콘드리아 발전소' + (lit ? ' · 가동 중' : ' · 멈춤'), x + 120, y - 210, lit ? '#c46a10' : '#555');
 }
 function questMark(id) {
   if (!S.fl.pro) return id === 'chief';
@@ -1149,7 +1154,8 @@ function questMark(id) {
 function bang(x, y, t) { ctx.save(); ctx.translate(x, y + Math.sin(t * 4) * 4); rr(ctx, -13, -30, 26, 34, 10); fillS(ctx, '#ffd23f', 3); text('!', 0, -12, 26, OL); ctx.restore(); }
 function tag(s, x, y, bg) {
   ctx.font = `15px ${FONT}`; const w = ctx.measureText(s).width + 14;
-  rr(ctx, x - w / 2, y, w, 22, 7); ctx.fillStyle = bg + 'dd'; ctx.fill(); text(s, x, y + 11.5, 15, '#fff');
+  const hex = bg.length === 4 ? '#' + [...bg.slice(1)].map(h => h + h).join('') : bg; // '#333' + 'dd' is no colour at all: the box came out blank
+  rr(ctx, x - w / 2, y, w, 22, 7); ctx.fillStyle = hex + 'dd'; ctx.fill(); text(s, x, y + 11.5, 15, '#fff');
 }
 function aura(x, y, t) { ctx.save(); ctx.globalAlpha = 0.35 + 0.15 * Math.sin(t * 5); ctx.beginPath(); ctx.ellipse(x, y - 4, 30, 9, 0, 0, Math.PI * 2); ctx.fillStyle = '#ffd23f'; ctx.fill(); ctx.restore(); }
 function shotDraw(s, t) {
