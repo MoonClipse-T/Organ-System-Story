@@ -18,17 +18,27 @@ const QUIZ = [
 
 // ---- 직업 (1차) ------------------------------------------------------------------------------
 // range: how far the hit reaches in front (px); mult: × damage; hits: monsters at once; mp: skill cost
+// shot: a thing that flies (star · arrow); magic: appears right on the target (마법사: nothing to throw)
+// move: the Lv.5 skill (Shift / 이동 버튼), power: the Lv.10 skill (V / 강타 버튼, one target, long cooldown). No stats: levels give skills.
+const SKILL_LV = { move: 5, power: 10 };
 const JOBS = {
-  warrior: { name: '전사', main: 'STR', color: '#d9534f', weapon: 'sword', blurb: '튼튼한 몸, 가까이서 강하게!',
-    atk: { range: 95, mult: 1, hits: 1, cd: 0.45 }, skill: { name: '힘껏 베기', range: 150, mult: 2.2, hits: 4, mp: 8, cd: 0.7 }, hpBonus: 40, mpBase: 20 },
-  thief: { name: '도적', main: 'LUK', color: '#6f5bd6', weapon: 'star', blurb: '재빠르게 표창을 휙휙!',
-    atk: { range: 380, mult: 0.9, hits: 1, cd: 0.4, shot: 'star' }, skill: { name: '쌍표창', range: 420, mult: 1.5, hits: 1, twice: true, mp: 8, cd: 0.6, shot: 'star' }, hpBonus: 10, mpBase: 26 },
-  archer: { name: '궁수', main: 'DEX', color: '#3a9d5d', weapon: 'bow', blurb: '멀리서 정확하게!',
-    atk: { range: 480, mult: 1, hits: 1, cd: 0.5, shot: 'arrow' }, skill: { name: '관통 화살', range: 560, mult: 1.6, hits: 3, mp: 10, cd: 0.7, shot: 'arrow' }, hpBonus: 15, mpBase: 26 },
-  mage: { name: '마법사', main: 'INT', color: '#2f7fd1', weapon: 'wand', blurb: '에너지를 모아 펑!',
-    atk: { range: 260, mult: 0.9, hits: 1, cd: 0.5, shot: 'spark' }, skill: { name: '에너지 볼트', range: 400, mult: 2.4, hits: 1, mp: 10, cd: 0.6, shot: 'bolt' }, hpBonus: 0, mpBase: 50 },
+  warrior: { name: '전사', color: '#d9534f', weapon: 'sword', blurb: '튼튼한 몸, 가까이서 강하게!',
+    atk: { range: 95, mult: 1, hits: 1, cd: 0.45 }, skill: { name: '힘껏 베기', range: 150, mult: 2.2, hits: 4, mp: 8, cd: 0.7 },
+    move: { name: '대쉬', kind: 'dash', mp: 4, cd: 1.2, text: '앞으로 빠르게 돌진해요. 돌진하는 동안은 부딪혀도 다치지 않아요.' },
+    power: { name: '대지 강타', range: 140, mult: 6, hits: 1, mp: 14, cd: 8, fx: 'quake', text: '눈앞의 한 마리를 아주 세게 내려쳐요. 8초에 한 번.' }, hpBonus: 40, mpBase: 20 },
+  thief: { name: '도적', color: '#6f5bd6', weapon: 'star', blurb: '재빠르게 표창을 휙휙!',
+    atk: { range: 380, mult: 0.9, hits: 1, cd: 0.4, shot: 'star' }, skill: { name: '쌍표창', range: 420, mult: 1.5, hits: 1, twice: true, mp: 8, cd: 0.6, shot: 'star' },
+    move: { name: '더블 점프', kind: 'djump', mp: 2, cd: 0.2, text: '공중에서 한 번 더 앞으로 뛰어요. 점프 버튼을 공중에서 한 번 더 눌러도 돼요.' },
+    power: { name: '급소 표창', range: 460, mult: 5.5, hits: 1, mp: 14, cd: 8, shot: 'bigstar', text: '커다란 표창 하나로 한 마리의 급소를 노려요. 8초에 한 번.' }, hpBonus: 10, mpBase: 26 },
+  archer: { name: '궁수', color: '#3a9d5d', weapon: 'bow', blurb: '멀리서 정확하게!',
+    atk: { range: 480, mult: 1, hits: 1, cd: 0.5, shot: 'arrow' }, skill: { name: '관통 화살', range: 560, mult: 1.6, hits: 3, mp: 10, cd: 0.7, shot: 'arrow' },
+    move: { name: '백대쉬', kind: 'back', mp: 4, cd: 1.2, text: '바라보는 쪽은 그대로 두고 뒤로 훌쩍 물러나요. 거리를 벌리고 다시 쏘세요.' },
+    power: { name: '저격', range: 760, mult: 5.5, hits: 1, mp: 14, cd: 8, shot: 'snipe', text: '아주 멀리 있는 한 마리를 꿰뚫는 화살. 8초에 한 번.' }, hpBonus: 15, mpBase: 26 },
+  mage: { name: '마법사', color: '#2f7fd1', weapon: 'wand', blurb: '던지지 않아요. 적 바로 위에서 마법이 터져요!',
+    atk: { range: 300, mult: 1, hits: 1, cd: 0.5, magic: 'burst' }, skill: { name: '매직 클로', range: 360, mult: 1.3, hits: 1, twice: true, mp: 10, cd: 0.6, magic: 'claw' },
+    move: { name: '텔레포트', kind: 'tele', mp: 6, cd: 1.4, text: '보는 쪽(또는 누르고 있는 쪽)으로 순간 이동해요.' },
+    power: { name: '번개 일격', range: 480, mult: 6, hits: 1, mp: 16, cd: 8, magic: 'zap', text: '하늘에서 번개를 한 마리에게 내리꽂아요. 8초에 한 번.' }, hpBonus: 0, mpBase: 50 },
 };
-const STATS = ['STR', 'DEX', 'INT', 'LUK'];
 // 직업 옷: painted parts in assets/sp/<job>-torso|arm|leg.png. th: torso height (px), ty: where the torso's bottom sits
 const JOB_LOOK = {
   warrior: { th: 27, ty: -14 }, thief: { th: 30, ty: -13 }, archer: { th: 30, ty: -13 }, mage: { th: 30, ty: -12 },
@@ -158,8 +168,9 @@ const NPCS = {
 
 // ---- 퀘스트 (파티가 함께, 차례대로) ------------------------------------------------------------
 // kill: monsters per player; the party shares one count and needs it × its size (2명 ×2 … 4명 ×4). Other tasks: every
-// member does them. Then the party leader writes the answer to ask; the teacher OKs it
-// and the whole party moves on. hint: what a good answer has, shown to the teacher only. sys: the card shown when done.
+// member does them. Then the party leader writes the answer to ask — once — and the party moves straight on. The teacher
+// marks it 정답/오답 whenever; a 오답 makes that organ system fail in the boss fight, and only after losing there may the
+// party write it again. hint: what a good answer has, shown to the teacher only. sys: the card shown when done.
 const QUESTS = [
   { id: 'start', title: '세포 마을의 정전', at: 'chief', go: '셀리 촌장에게 말 걸기 · 파티는 마을에서만 만들 수 있어요' },
   { id: 'digest', title: '영양소를 분해하라', at: 'villi', kill: { starch: 5, protein: 3, fat: 3 }, sys: 'digest',
@@ -180,11 +191,10 @@ const QUESTS = [
     go: '모두 가로막 아저씨(기관지 나무 아래)에게 이산화 탄소 내쉬기 + 콩팥 정수장에서 요소 유령 잡기 → 네프론 정수기에게',
     ask: '세포 호흡으로 생긴 이산화 탄소와 요소는 각각 어떻게 몸 밖으로 나갈까요?',
     hint: '이산화 탄소는 순환계를 거쳐 호흡계(폐)에서 날숨으로, 요소 등 노폐물은 배설계(콩팥)에서 걸러져 오줌으로 나간다.' },
-  { id: 'link', title: '모든 게 이어졌다', at: 'chief', go: '셀리 촌장에게 돌아가기' },
-  { id: 'free', title: '보스를 기다리며', go: '사냥으로 레벨을 올리며 선생님이 세균 소굴을 열어 주기를 기다려요' },
+  { id: 'boss', title: '최종 미션: 세균 대왕', at: 'chief', go: '셀리 촌장에게 이야기를 듣고, 마을 가운데 세균 소굴 포탈로 파티와 함께!' },
 ];
 
-// ---- 보스: 빠진 기관계마다 이길 수 없는 까닭이 하나씩 ------------------------------------------------
+// ---- 보스: 답이 틀린(오답) 기관계마다 이길 수 없는 까닭이 하나씩 ------------------------------------------------
 const BOSS_RULES = [
   { q: 1, sys: 'digest', name: '굶주림', text: '소화계가 영양소를 흡수하지 못해 힘이 없어요. 공격이 거의 들어가지 않아요.' },
   { q: 2, sys: 'lung', name: '숨막힘', text: '호흡계가 산소를 받아들이지 못해 HP가 계속 줄어요.' },
@@ -211,7 +221,9 @@ const TALK = {
     '이렇게 얻은 에너지는 체온 유지에 약 60 %, 나머지는 두뇌 활동, 근육 운동, 소리 내기, 생장에 쓰여.',
     '그런데 큰일이야! 마을 발전소(미토콘드리아)가 멈춰서 마을이 깜깜해. 세포 호흡을 하려면 영양소와 산소가 필요해.',
     '파티는 지금 이 마을에서만 만들 수 있어 (최대 4명). 포탈을 한 번 지나면 더는 못 만들어! 혼자 가도 괜찮아.',
-    '파티원 모두가 퀘스트를 끝내고, 파티장이 답을 써서 선생님께 통과를 받아야 다음 기관계로 갈 수 있어. 먼저 왼쪽 포탈로 소화관 동굴에 가 봐!',
+    '퀘스트를 끝내면 파티장이 답을 써서 내. 답은 딱 한 번만 낼 수 있고, 내면 바로 다음 기관계로 가. 선생님이 나중에 확인하셔.',
+    '틀린 답이 있으면 마지막 보스전에서 그 기관계가 말썽을 부려 질 거야. 그러니 교과서를 보며 파티원과 의논해서 정성껏 써! 먼저 왼쪽 포탈로 소화관 동굴에 가 봐!',
+    '그리고 조심해. 파티원 한 명이라도 쓰러지면 파티 모두 마을로 돌아와야 해.',
   ],
   villi_wait: ['영양소는 너무 커서 그대로는 못 들어가. 녹말 슬라임, 단백질 꾸물이, 지방 방울을 잡아서 잘게 분해해 줘! 파티원이 잡은 것도 함께 세어져.'],
   villi_done: ['포도당, 아미노산, 지방산! 잘게 분해됐구나. 내 융털로 흡수할게.'],
@@ -225,5 +237,5 @@ const TALK = {
   nephron_wait: ['요소 유령이 혈액 속에 떠다니고 있어! 파티와 함께 잡아 주면 내가 걸러서 오줌으로 내보낼게. 이산화 탄소는 모두 가로막 아저씨에게 내쉬어야 해.'],
   nephron_done: ['사구체에서 보먼주머니로 걸러내고… 필요한 건 다시 흡수하고… 요소는 오줌으로 내보냈어!'],
   link: ['다 해냈구나! 지금까지의 여행을 돌아보자.'],
-  free: ['원정대 덕분에 마을이 살아났어! 선생님이 세균 소굴을 열어 주면 파티와 함께 보스에 도전해 봐.'],
+  free: ['마을 가운데 세균 소굴 포탈이 열렸어! 파티와 함께 세균 대왕을 무찔러 줘.', '선생님이 너희 답을 모두 확인하셔야 들어갈 수 있어. 틀린 답이 있으면 그 기관계가 말썽을 부릴 거야. 지면 무엇이 틀렸는지 보고 다시 써서 도전해!'],
 };

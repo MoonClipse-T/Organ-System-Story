@@ -13,10 +13,9 @@ window.CONFIG = {
   climb: { value: 160, min: 60, max: 300, step: 10 },
   fall_max: { value: 1000, min: 500, max: 1600, step: 50 },
   // fighting
-  ap_per_answer: { value: 5, min: 1, max: 10, step: 1 },    // stat points per correct entry answer
-  base_stat: { value: 4, min: 1, max: 10, step: 1 },
-  dmg_base: { value: 10, min: 1, max: 40, step: 1 },        // damage = base + main×k + lv×2
-  dmg_per_main: { value: 0.8, min: 0.1, max: 3, step: 0.1 },
+  exp_per_answer: { value: 6, min: 0, max: 30, step: 1 },   // EXP per correct entry answer (no stat points any more)
+  dmg_base: { value: 30, min: 1, max: 80, step: 1 },        // damage = base + lv × per_lv (levels give skills, not stats)
+  dmg_per_lv: { value: 4, min: 0, max: 20, step: 0.5 },
   energy_bonus: { value: 0.3, min: 0, max: 1, step: 0.05 },  // +30% damage after 세포 호흡
   hp_base: { value: 60, min: 20, max: 200, step: 5 },
   hp_per_lv: { value: 20, min: 5, max: 60, step: 1 },

@@ -45,7 +45,7 @@ async function netConnect(base, stage = () => {}) {
     del(p) { const k = K(p), pre = k + '/'; for (let i = localStorage.length - 1; i >= 0; i--) { const x = localStorage.key(i); if (x === k || x.startsWith(pre)) localStorage.removeItem(x); } fire(k); },
     on(p, cb) { const k = K(p), v = () => read(k) ?? tree(p); const off = sub(x => (x === k || k.startsWith(x + '/') || x.startsWith(k + '/')) && cb(v())); cb(v()); return off; },
     onKids(p, cb) { const pre = K(p) + '/', k = K(p); const off = sub(x => (x === k || x.startsWith(pre) || k.startsWith(x + '/')) && cb(kids(p))); cb(kids(p)); return off; },
-    get: async p => read(K(p)) ?? (Object.keys(kids(p)).length ? kids(p) : null),
+    get: async p => read(K(p)) ?? tree(p), // the whole branch, like the server gives
   };
 }
 let SDK = null; // one Firebase app for every channel this page opens
