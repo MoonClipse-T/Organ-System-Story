@@ -35,7 +35,7 @@
 - 혼자 해 보기: `?offline=1` (방 번호 없이)
 - 맵 하나만 시험: `?try=vesselH` (혈관 급류 어려움) · `vessel`(쉬움) · `lung` · `lungH` · `digest` · `mito`(발전소) · `kidney`(잠입) · `lair`(보스), 직업·레벨은 `&job=mage&lv=10` (warrior · thief · archer · mage). 시험용 캐릭터라 저장되지 않아요
 
-수업 앞 개념 정리 슬라이드(교과서 230~231쪽, 6쪽 + 게임 QR): `concept.html` — 원본은 `과학2_2학기_생명/수업 강의자료 모음/Vibe code(과학2)/_build/decks/09_organteam` (빌드: `node tools/build.mjs 09_organteam`)
+수업 앞 개념 정리 슬라이드(교과서 230~231쪽, 6쪽: 세포호흡 · 에너지의 쓰임 · 물질의 이동 · 네 기관계의 관계 · 정리 + 게임 QR): `concept.html` — 원본은 `과학2_2학기_생명/수업 강의자료 모음/Vibe code(과학2)/_build/decks/09_organteam` (빌드: `node tools/build.mjs 09_organteam`)
 
 조작: ←→ 이동, ↑ 포탈·대화·사다리, ↓ 엎드리기(사다리 위에서는 내려가기), Space 점프, Z 공격, X 스킬, Shift 이동 스킬(Lv.5), V 강타(Lv.10) (디벗은 화면 버튼 6개)
 
